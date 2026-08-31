@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe>
+    <infNFe Id="NFe35260855666777000105550010000000431000000430" versao="4.00">
+      <ide>
+        <nNF>43</nNF>
+        <serie>1</serie>
+        <dhEmi>2026-08-02T19:00:00-03:00</dhEmi>
+      </ide>
+      <emit>
+        <CNPJ>55666777000105</CNPJ>
+        <xNome>EPSILON DISTRIBUIDORA S.A.</xNome>
+      </emit>
+      <dest>
+        <CNPJ>98765432000188</CNPJ>
+        <xNome>CLIENTE EXEMPLO LTDA</xNome>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>011</cProd>
+          <xProd>FARINHA DE TRIGO DONA BENTA 1KG</xProd>
+          <NCM>11010010</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>7.0000</qCom>
+          <vUnCom>6.3339</vUnCom>
+          <vProd>44.34</vProd>
+        </prod>
+      </det>
+      <det nItem="2">
+        <prod>
+          <cProd>009</cProd>
+          <xProd>MOLHO TOMATE FUGINI 340G</xProd>
+          <NCM>20029000</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>9.0000</qCom>
+          <vUnCom>3.5750</vUnCom>
+          <vProd>32.18</vProd>
+        </prod>
+      </det>
+      <total>
+        <ICMSTot>
+          <vNF>76.52</vNF>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+</nfeProc>

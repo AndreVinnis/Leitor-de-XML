@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe>
+    <infNFe Id="NFe35260898765432000188550010000000241000000240" versao="4.00">
+      <ide>
+        <nNF>24</nNF>
+        <serie>1</serie>
+        <dhEmi>2026-08-02T00:00:00-03:00</dhEmi>
+      </ide>
+      <emit>
+        <CNPJ>98765432000188</CNPJ>
+        <xNome>CLIENTE EXEMPLO LTDA</xNome>
+      </emit>
+      <dest>
+        <CNPJ>44555666000124</CNPJ>
+        <xNome>COMERCIAL DELTA EIRELI</xNome>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>009</cProd>
+          <xProd>MOLHO TOMATE FUGINI 340G</xProd>
+          <NCM>20029000</NCM>
+          <CFOP>5102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>19.0000</qCom>
+          <vUnCom>3.6174</vUnCom>
+          <vProd>68.73</vProd>
+        </prod>
+      </det>
+      <total>
+        <ICMSTot>
+          <vNF>68.73</vNF>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+</nfeProc>

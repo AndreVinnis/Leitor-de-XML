@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe>
+    <infNFe Id="NFe35260866777888000186550010000000351000000350" versao="4.00">
+      <ide>
+        <nNF>35</nNF>
+        <serie>1</serie>
+        <dhEmi>2026-08-02T11:00:00-03:00</dhEmi>
+      </ide>
+      <emit>
+        <CNPJ>66777888000186</CNPJ>
+        <xNome>ZETA ATACADISTA LTDA</xNome>
+      </emit>
+      <dest>
+        <CNPJ>98765432000188</CNPJ>
+        <xNome>CLIENTE EXEMPLO LTDA</xNome>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>011</cProd>
+          <xProd>FARINHA DE TRIGO DONA BENTA 1KG</xProd>
+          <NCM>11010010</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>5.0000</qCom>
+          <vUnCom>6.1958</vUnCom>
+          <vProd>30.98</vProd>
+        </prod>
+      </det>
+      <total>
+        <ICMSTot>
+          <vNF>30.98</vNF>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+</nfeProc>

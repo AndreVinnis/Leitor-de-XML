@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe>
+    <infNFe Id="NFe35260877888999000167550010000000411000000410" versao="4.00">
+      <ide>
+        <nNF>41</nNF>
+        <serie>1</serie>
+        <dhEmi>2026-08-02T17:00:00-03:00</dhEmi>
+      </ide>
+      <emit>
+        <CNPJ>77888999000167</CNPJ>
+        <xNome>COMERCIO ETA LTDA</xNome>
+      </emit>
+      <dest>
+        <CNPJ>98765432000188</CNPJ>
+        <xNome>CLIENTE EXEMPLO LTDA</xNome>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>012</cProd>
+          <xProd>BISCOITO MAIZENA PIRAQUE 200G</xProd>
+          <NCM>19053100</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>3.0000</qCom>
+          <vUnCom>5.0513</vUnCom>
+          <vProd>15.15</vProd>
+        </prod>
+      </det>
+      <det nItem="2">
+        <prod>
+          <cProd>004</cProd>
+          <xProd>OLEO SOJA LIZA 900ML</xProd>
+          <NCM>15071000</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>2.0000</qCom>
+          <vUnCom>9.7974</vUnCom>
+          <vProd>19.59</vProd>
+        </prod>
+      </det>
+      <det nItem="3">
+        <prod>
+          <cProd>005</cProd>
+          <xProd>CAFE PILAO 500G</xProd>
+          <NCM>09011110</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>1.0000</qCom>
+          <vUnCom>15.8181</vUnCom>
+          <vProd>15.82</vProd>
+        </prod>
+      </det>
+      <total>
+        <ICMSTot>
+          <vNF>50.56</vNF>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+</nfeProc>

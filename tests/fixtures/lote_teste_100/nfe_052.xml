@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe>
+    <infNFe Id="NFe35260888999000000148550010000000521000000520" versao="4.00">
+      <ide>
+        <nNF>52</nNF>
+        <serie>1</serie>
+        <dhEmi>2026-08-03T04:00:00-03:00</dhEmi>
+      </ide>
+      <emit>
+        <CNPJ>88999000000148</CNPJ>
+        <xNome>THETA COMERCIO DE ALIMENTOS LTDA</xNome>
+      </emit>
+      <dest>
+        <CNPJ>98765432000188</CNPJ>
+        <xNome>CLIENTE EXEMPLO LTDA</xNome>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>011</cProd>
+          <xProd>FARINHA DE TRIGO DONA BENTA 1KG</xProd>
+          <NCM>11010010</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>4.0000</qCom>
+          <vUnCom>6.3646</vUnCom>
+          <vProd>25.46</vProd>
+        </prod>
+      </det>
+      <det nItem="2">
+        <prod>
+          <cProd>010</cProd>
+          <xProd>SAL REFINADO CISNE 1KG</xProd>
+          <NCM>25010020</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>7.0000</qCom>
+          <vUnCom>2.9414</vUnCom>
+          <vProd>20.59</vProd>
+        </prod>
+      </det>
+      <total>
+        <ICMSTot>
+          <vNF>46.05</vNF>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+</nfeProc>

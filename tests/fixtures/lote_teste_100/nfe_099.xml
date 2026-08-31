@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe>
+    <infNFe Id="NFe35260898765432000188550010000000991000000990" versao="4.00">
+      <ide>
+        <nNF>99</nNF>
+        <serie>1</serie>
+        <dhEmi>2026-08-05T03:00:00-03:00</dhEmi>
+      </ide>
+      <emit>
+        <CNPJ>98765432000188</CNPJ>
+        <xNome>CLIENTE EXEMPLO LTDA</xNome>
+      </emit>
+      <dest>
+        <CNPJ>33444555000143</CNPJ>
+        <xNome>MERCADO GAMA SUPERMERCADOS LTDA</xNome>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>012</cProd>
+          <xProd>BISCOITO MAIZENA PIRAQUE 200G</xProd>
+          <NCM>19053100</NCM>
+          <CFOP>5102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>9.0000</qCom>
+          <vUnCom>5.0002</vUnCom>
+          <vProd>45.00</vProd>
+        </prod>
+      </det>
+      <det nItem="2">
+        <prod>
+          <cProd>005</cProd>
+          <xProd>CAFE PILAO 500G</xProd>
+          <NCM>09011110</NCM>
+          <CFOP>5102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>30.0000</qCom>
+          <vUnCom>16.0537</vUnCom>
+          <vProd>481.61</vProd>
+        </prod>
+      </det>
+      <total>
+        <ICMSTot>
+          <vNF>526.61</vNF>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+</nfeProc>

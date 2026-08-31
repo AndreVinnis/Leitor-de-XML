@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe>
+    <infNFe Id="NFe35260811222333000181550010000000291000000290" versao="4.00">
+      <ide>
+        <nNF>29</nNF>
+        <serie>1</serie>
+        <dhEmi>2026-08-02T05:00:00-03:00</dhEmi>
+      </ide>
+      <emit>
+        <CNPJ>11222333000181</CNPJ>
+        <xNome>DISTRIBUIDORA ALFA LTDA</xNome>
+      </emit>
+      <dest>
+        <CNPJ>98765432000188</CNPJ>
+        <xNome>CLIENTE EXEMPLO LTDA</xNome>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>006</cProd>
+          <xProd>LEITE NINHO INTEGRAL 400G</xProd>
+          <NCM>04022110</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>10.0000</qCom>
+          <vUnCom>22.5672</vUnCom>
+          <vProd>225.67</vProd>
+        </prod>
+      </det>
+      <det nItem="2">
+        <prod>
+          <cProd>001</cProd>
+          <xProd>ARROZ TIO JOAO 5KG</xProd>
+          <NCM>10063021</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>9.0000</qCom>
+          <vUnCom>24.7469</vUnCom>
+          <vProd>222.72</vProd>
+        </prod>
+      </det>
+      <det nItem="3">
+        <prod>
+          <cProd>011</cProd>
+          <xProd>FARINHA DE TRIGO DONA BENTA 1KG</xProd>
+          <NCM>11010010</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>9.0000</qCom>
+          <vUnCom>5.8585</vUnCom>
+          <vProd>52.73</vProd>
+        </prod>
+      </det>
+      <total>
+        <ICMSTot>
+          <vNF>501.12</vNF>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+</nfeProc>

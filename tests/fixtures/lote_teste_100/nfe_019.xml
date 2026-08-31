@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe>
+    <infNFe Id="NFe35260898765432000188550010000000191000000190" versao="4.00">
+      <ide>
+        <nNF>19</nNF>
+        <serie>1</serie>
+        <dhEmi>2026-08-01T19:00:00-03:00</dhEmi>
+      </ide>
+      <emit>
+        <CNPJ>98765432000188</CNPJ>
+        <xNome>CLIENTE EXEMPLO LTDA</xNome>
+      </emit>
+      <dest>
+        <CNPJ>66777888000186</CNPJ>
+        <xNome>ZETA ATACADISTA LTDA</xNome>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>009</cProd>
+          <xProd>MOLHO TOMATE FUGINI 340G</xProd>
+          <NCM>20029000</NCM>
+          <CFOP>5102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>22.0000</qCom>
+          <vUnCom>3.5252</vUnCom>
+          <vProd>77.55</vProd>
+        </prod>
+      </det>
+      <det nItem="2">
+        <prod>
+          <cProd>008</cProd>
+          <xProd>SARDINHA COQUEIRO LATA 125G</xProd>
+          <NCM>16041300</NCM>
+          <CFOP>5102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>6.0000</qCom>
+          <vUnCom>4.0968</vUnCom>
+          <vProd>24.58</vProd>
+        </prod>
+      </det>
+      <total>
+        <ICMSTot>
+          <vNF>102.13</vNF>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+</nfeProc>

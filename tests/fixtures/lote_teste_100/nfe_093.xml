@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe>
+    <infNFe Id="NFe35260898765432000188550010000000931000000930" versao="4.00">
+      <ide>
+        <nNF>93</nNF>
+        <serie>1</serie>
+        <dhEmi>2026-08-04T21:00:00-03:00</dhEmi>
+      </ide>
+      <emit>
+        <CNPJ>98765432000188</CNPJ>
+        <xNome>CLIENTE EXEMPLO LTDA</xNome>
+      </emit>
+      <dest>
+        <CNPJ>88999000000148</CNPJ>
+        <xNome>THETA COMERCIO DE ALIMENTOS LTDA</xNome>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>008</cProd>
+          <xProd>SARDINHA COQUEIRO LATA 125G</xProd>
+          <NCM>16041300</NCM>
+          <CFOP>5102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>6.0000</qCom>
+          <vUnCom>4.3133</vUnCom>
+          <vProd>25.88</vProd>
+        </prod>
+      </det>
+      <total>
+        <ICMSTot>
+          <vNF>25.88</vNF>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+</nfeProc>

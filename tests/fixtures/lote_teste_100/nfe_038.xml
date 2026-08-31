@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe>
+    <infNFe Id="NFe35260898765432000188550010000000381000000380" versao="4.00">
+      <ide>
+        <nNF>38</nNF>
+        <serie>1</serie>
+        <dhEmi>2026-08-02T14:00:00-03:00</dhEmi>
+      </ide>
+      <emit>
+        <CNPJ>98765432000188</CNPJ>
+        <xNome>CLIENTE EXEMPLO LTDA</xNome>
+      </emit>
+      <dest>
+        <CNPJ>77888999000167</CNPJ>
+        <xNome>COMERCIO ETA LTDA</xNome>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>001</cProd>
+          <xProd>ARROZ TIO JOAO 5KG</xProd>
+          <NCM>10063021</NCM>
+          <CFOP>5102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>3.0000</qCom>
+          <vUnCom>26.0336</vUnCom>
+          <vProd>78.10</vProd>
+        </prod>
+      </det>
+      <det nItem="2">
+        <prod>
+          <cProd>002</cProd>
+          <xProd>FEIJAO CARIOCA 1KG</xProd>
+          <NCM>07133399</NCM>
+          <CFOP>5102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>6.0000</qCom>
+          <vUnCom>8.2058</vUnCom>
+          <vProd>49.23</vProd>
+        </prod>
+      </det>
+      <det nItem="3">
+        <prod>
+          <cProd>011</cProd>
+          <xProd>FARINHA DE TRIGO DONA BENTA 1KG</xProd>
+          <NCM>11010010</NCM>
+          <CFOP>5102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>3.0000</qCom>
+          <vUnCom>6.1358</vUnCom>
+          <vProd>18.41</vProd>
+        </prod>
+      </det>
+      <total>
+        <ICMSTot>
+          <vNF>145.74</vNF>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+</nfeProc>

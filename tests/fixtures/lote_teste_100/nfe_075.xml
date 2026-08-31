@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe>
+    <infNFe Id="NFe35260898765432000188550010000000751000000750" versao="4.00">
+      <ide>
+        <nNF>75</nNF>
+        <serie>1</serie>
+        <dhEmi>2026-08-04T03:00:00-03:00</dhEmi>
+      </ide>
+      <emit>
+        <CNPJ>98765432000188</CNPJ>
+        <xNome>CLIENTE EXEMPLO LTDA</xNome>
+      </emit>
+      <dest>
+        <CNPJ>55666777000105</CNPJ>
+        <xNome>EPSILON DISTRIBUIDORA S.A.</xNome>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>012</cProd>
+          <xProd>BISCOITO MAIZENA PIRAQUE 200G</xProd>
+          <NCM>19053100</NCM>
+          <CFOP>5102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>1.0000</qCom>
+          <vUnCom>4.8824</vUnCom>
+          <vProd>4.88</vProd>
+        </prod>
+      </det>
+      <det nItem="2">
+        <prod>
+          <cProd>005</cProd>
+          <xProd>CAFE PILAO 500G</xProd>
+          <NCM>09011110</NCM>
+          <CFOP>5102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>17.0000</qCom>
+          <vUnCom>14.6225</vUnCom>
+          <vProd>248.58</vProd>
+        </prod>
+      </det>
+      <det nItem="3">
+        <prod>
+          <cProd>009</cProd>
+          <xProd>MOLHO TOMATE FUGINI 340G</xProd>
+          <NCM>20029000</NCM>
+          <CFOP>5102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>30.0000</qCom>
+          <vUnCom>3.6798</vUnCom>
+          <vProd>110.39</vProd>
+        </prod>
+      </det>
+      <total>
+        <ICMSTot>
+          <vNF>363.85</vNF>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+</nfeProc>

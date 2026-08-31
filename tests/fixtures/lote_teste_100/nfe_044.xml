@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe>
+    <infNFe Id="NFe35260898765432000188550010000000441000000440" versao="4.00">
+      <ide>
+        <nNF>44</nNF>
+        <serie>1</serie>
+        <dhEmi>2026-08-02T20:00:00-03:00</dhEmi>
+      </ide>
+      <emit>
+        <CNPJ>98765432000188</CNPJ>
+        <xNome>CLIENTE EXEMPLO LTDA</xNome>
+      </emit>
+      <dest>
+        <CNPJ>55666777000105</CNPJ>
+        <xNome>EPSILON DISTRIBUIDORA S.A.</xNome>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>010</cProd>
+          <xProd>SAL REFINADO CISNE 1KG</xProd>
+          <NCM>25010020</NCM>
+          <CFOP>5102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>5.0000</qCom>
+          <vUnCom>2.7694</vUnCom>
+          <vProd>13.85</vProd>
+        </prod>
+      </det>
+      <total>
+        <ICMSTot>
+          <vNF>13.85</vNF>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+</nfeProc>

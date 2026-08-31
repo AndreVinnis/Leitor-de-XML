@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe>
+    <infNFe Id="NFe35260898765432000188550010000000631000000630" versao="4.00">
+      <ide>
+        <nNF>63</nNF>
+        <serie>1</serie>
+        <dhEmi>2026-08-03T15:00:00-03:00</dhEmi>
+      </ide>
+      <emit>
+        <CNPJ>98765432000188</CNPJ>
+        <xNome>CLIENTE EXEMPLO LTDA</xNome>
+      </emit>
+      <dest>
+        <CNPJ>88999000000148</CNPJ>
+        <xNome>THETA COMERCIO DE ALIMENTOS LTDA</xNome>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>001</cProd>
+          <xProd>ARROZ TIO JOAO 5KG</xProd>
+          <NCM>10063021</NCM>
+          <CFOP>5102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>5.0000</qCom>
+          <vUnCom>25.4817</vUnCom>
+          <vProd>127.41</vProd>
+        </prod>
+      </det>
+      <total>
+        <ICMSTot>
+          <vNF>127.41</vNF>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+</nfeProc>

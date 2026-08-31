@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe>
+    <infNFe Id="NFe35260898765432000188550010000000641000000640" versao="4.00">
+      <ide>
+        <nNF>64</nNF>
+        <serie>1</serie>
+        <dhEmi>2026-08-03T16:00:00-03:00</dhEmi>
+      </ide>
+      <emit>
+        <CNPJ>98765432000188</CNPJ>
+        <xNome>CLIENTE EXEMPLO LTDA</xNome>
+      </emit>
+      <dest>
+        <CNPJ>66777888000186</CNPJ>
+        <xNome>ZETA ATACADISTA LTDA</xNome>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>007</cProd>
+          <xProd>MACARRAO BARILLA 500G</xProd>
+          <NCM>19021900</NCM>
+          <CFOP>5102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>7.0000</qCom>
+          <vUnCom>6.3882</vUnCom>
+          <vProd>44.72</vProd>
+        </prod>
+      </det>
+      <det nItem="2">
+        <prod>
+          <cProd>005</cProd>
+          <xProd>CAFE PILAO 500G</xProd>
+          <NCM>09011110</NCM>
+          <CFOP>5102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>30.0000</qCom>
+          <vUnCom>14.1925</vUnCom>
+          <vProd>425.78</vProd>
+        </prod>
+      </det>
+      <total>
+        <ICMSTot>
+          <vNF>470.50</vNF>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+</nfeProc>

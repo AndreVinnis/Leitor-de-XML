@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe>
+    <infNFe Id="NFe35260822333444000162550010000000171000000170" versao="4.00">
+      <ide>
+        <nNF>17</nNF>
+        <serie>1</serie>
+        <dhEmi>2026-08-01T17:00:00-03:00</dhEmi>
+      </ide>
+      <emit>
+        <CNPJ>22333444000162</CNPJ>
+        <xNome>ATACADO BETA COMERCIO LTDA</xNome>
+      </emit>
+      <dest>
+        <CNPJ>98765432000188</CNPJ>
+        <xNome>CLIENTE EXEMPLO LTDA</xNome>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>008</cProd>
+          <xProd>SARDINHA COQUEIRO LATA 125G</xProd>
+          <NCM>16041300</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>3.0000</qCom>
+          <vUnCom>4.1568</vUnCom>
+          <vProd>12.47</vProd>
+        </prod>
+      </det>
+      <det nItem="2">
+        <prod>
+          <cProd>002</cProd>
+          <xProd>FEIJAO CARIOCA 1KG</xProd>
+          <NCM>07133399</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>8.0000</qCom>
+          <vUnCom>8.5847</vUnCom>
+          <vProd>68.68</vProd>
+        </prod>
+      </det>
+      <det nItem="3">
+        <prod>
+          <cProd>009</cProd>
+          <xProd>MOLHO TOMATE FUGINI 340G</xProd>
+          <NCM>20029000</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>3.0000</qCom>
+          <vUnCom>3.5440</vUnCom>
+          <vProd>10.63</vProd>
+        </prod>
+      </det>
+      <total>
+        <ICMSTot>
+          <vNF>91.78</vNF>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+</nfeProc>

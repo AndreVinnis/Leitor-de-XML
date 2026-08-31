@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe>
+    <infNFe Id="NFe35260898765432000188550010000000221000000220" versao="4.00">
+      <ide>
+        <nNF>22</nNF>
+        <serie>1</serie>
+        <dhEmi>2026-08-01T22:00:00-03:00</dhEmi>
+      </ide>
+      <emit>
+        <CNPJ>98765432000188</CNPJ>
+        <xNome>CLIENTE EXEMPLO LTDA</xNome>
+      </emit>
+      <dest>
+        <CNPJ>33444555000143</CNPJ>
+        <xNome>MERCADO GAMA SUPERMERCADOS LTDA</xNome>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>010</cProd>
+          <xProd>SAL REFINADO CISNE 1KG</xProd>
+          <NCM>25010020</NCM>
+          <CFOP>5102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>4.0000</qCom>
+          <vUnCom>3.0508</vUnCom>
+          <vProd>12.20</vProd>
+        </prod>
+      </det>
+      <det nItem="2">
+        <prod>
+          <cProd>012</cProd>
+          <xProd>BISCOITO MAIZENA PIRAQUE 200G</xProd>
+          <NCM>19053100</NCM>
+          <CFOP>5102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>7.0000</qCom>
+          <vUnCom>4.6788</vUnCom>
+          <vProd>32.75</vProd>
+        </prod>
+      </det>
+      <det nItem="3">
+        <prod>
+          <cProd>008</cProd>
+          <xProd>SARDINHA COQUEIRO LATA 125G</xProd>
+          <NCM>16041300</NCM>
+          <CFOP>5102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>2.0000</qCom>
+          <vUnCom>4.4534</vUnCom>
+          <vProd>8.91</vProd>
+        </prod>
+      </det>
+      <total>
+        <ICMSTot>
+          <vNF>53.86</vNF>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+</nfeProc>

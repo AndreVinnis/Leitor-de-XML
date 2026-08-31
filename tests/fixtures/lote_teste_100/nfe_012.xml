@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe>
+    <infNFe Id="NFe35260855666777000105550010000000121000000120" versao="4.00">
+      <ide>
+        <nNF>12</nNF>
+        <serie>1</serie>
+        <dhEmi>2026-08-01T12:00:00-03:00</dhEmi>
+      </ide>
+      <emit>
+        <CNPJ>55666777000105</CNPJ>
+        <xNome>EPSILON DISTRIBUIDORA S.A.</xNome>
+      </emit>
+      <dest>
+        <CNPJ>98765432000188</CNPJ>
+        <xNome>CLIENTE EXEMPLO LTDA</xNome>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>010</cProd>
+          <xProd>SAL REFINADO CISNE 1KG</xProd>
+          <NCM>25010020</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>7.0000</qCom>
+          <vUnCom>2.8915</vUnCom>
+          <vProd>20.24</vProd>
+        </prod>
+      </det>
+      <det nItem="2">
+        <prod>
+          <cProd>007</cProd>
+          <xProd>MACARRAO BARILLA 500G</xProd>
+          <NCM>19021900</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>3.0000</qCom>
+          <vUnCom>6.6055</vUnCom>
+          <vProd>19.82</vProd>
+        </prod>
+      </det>
+      <det nItem="3">
+        <prod>
+          <cProd>012</cProd>
+          <xProd>BISCOITO MAIZENA PIRAQUE 200G</xProd>
+          <NCM>19053100</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>2.0000</qCom>
+          <vUnCom>5.0316</vUnCom>
+          <vProd>10.06</vProd>
+        </prod>
+      </det>
+      <total>
+        <ICMSTot>
+          <vNF>50.12</vNF>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+</nfeProc>

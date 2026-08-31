@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe>
+    <infNFe Id="NFe35260898765432000188550010000000021000000020" versao="4.00">
+      <ide>
+        <nNF>2</nNF>
+        <serie>1</serie>
+        <dhEmi>2026-08-01T02:00:00-03:00</dhEmi>
+      </ide>
+      <emit>
+        <CNPJ>98765432000188</CNPJ>
+        <xNome>CLIENTE EXEMPLO LTDA</xNome>
+      </emit>
+      <dest>
+        <CNPJ>44555666000124</CNPJ>
+        <xNome>COMERCIAL DELTA EIRELI</xNome>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>010</cProd>
+          <xProd>SAL REFINADO CISNE 1KG</xProd>
+          <NCM>25010020</NCM>
+          <CFOP>5102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>4.0000</qCom>
+          <vUnCom>3.0249</vUnCom>
+          <vProd>12.10</vProd>
+        </prod>
+      </det>
+      <det nItem="2">
+        <prod>
+          <cProd>001</cProd>
+          <xProd>ARROZ TIO JOAO 5KG</xProd>
+          <NCM>10063021</NCM>
+          <CFOP>5102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>9.0000</qCom>
+          <vUnCom>25.6157</vUnCom>
+          <vProd>230.54</vProd>
+        </prod>
+      </det>
+      <det nItem="3">
+        <prod>
+          <cProd>009</cProd>
+          <xProd>MOLHO TOMATE FUGINI 340G</xProd>
+          <NCM>20029000</NCM>
+          <CFOP>5102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>23.0000</qCom>
+          <vUnCom>3.7988</vUnCom>
+          <vProd>87.37</vProd>
+        </prod>
+      </det>
+      <total>
+        <ICMSTot>
+          <vNF>330.01</vNF>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+</nfeProc>

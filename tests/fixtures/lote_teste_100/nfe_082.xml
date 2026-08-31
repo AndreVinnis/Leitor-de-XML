@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe>
+    <infNFe Id="NFe35260888999000000148550010000000821000000820" versao="4.00">
+      <ide>
+        <nNF>82</nNF>
+        <serie>1</serie>
+        <dhEmi>2026-08-04T10:00:00-03:00</dhEmi>
+      </ide>
+      <emit>
+        <CNPJ>88999000000148</CNPJ>
+        <xNome>THETA COMERCIO DE ALIMENTOS LTDA</xNome>
+      </emit>
+      <dest>
+        <CNPJ>98765432000188</CNPJ>
+        <xNome>CLIENTE EXEMPLO LTDA</xNome>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>008</cProd>
+          <xProd>SARDINHA COQUEIRO LATA 125G</xProd>
+          <NCM>16041300</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>3.0000</qCom>
+          <vUnCom>4.6247</vUnCom>
+          <vProd>13.87</vProd>
+        </prod>
+      </det>
+      <det nItem="2">
+        <prod>
+          <cProd>006</cProd>
+          <xProd>LEITE NINHO INTEGRAL 400G</xProd>
+          <NCM>04022110</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>5.0000</qCom>
+          <vUnCom>23.9131</vUnCom>
+          <vProd>119.57</vProd>
+        </prod>
+      </det>
+      <total>
+        <ICMSTot>
+          <vNF>133.44</vNF>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+</nfeProc>

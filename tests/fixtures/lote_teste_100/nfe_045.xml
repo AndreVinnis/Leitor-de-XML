@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe>
+    <infNFe Id="NFe35260866777888000186550010000000451000000450" versao="4.00">
+      <ide>
+        <nNF>45</nNF>
+        <serie>1</serie>
+        <dhEmi>2026-08-02T21:00:00-03:00</dhEmi>
+      </ide>
+      <emit>
+        <CNPJ>66777888000186</CNPJ>
+        <xNome>ZETA ATACADISTA LTDA</xNome>
+      </emit>
+      <dest>
+        <CNPJ>98765432000188</CNPJ>
+        <xNome>CLIENTE EXEMPLO LTDA</xNome>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>006</cProd>
+          <xProd>LEITE NINHO INTEGRAL 400G</xProd>
+          <NCM>04022110</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>9.0000</qCom>
+          <vUnCom>21.5203</vUnCom>
+          <vProd>193.68</vProd>
+        </prod>
+      </det>
+      <det nItem="2">
+        <prod>
+          <cProd>007</cProd>
+          <xProd>MACARRAO BARILLA 500G</xProd>
+          <NCM>19021900</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>10.0000</qCom>
+          <vUnCom>6.3356</vUnCom>
+          <vProd>63.36</vProd>
+        </prod>
+      </det>
+      <det nItem="3">
+        <prod>
+          <cProd>010</cProd>
+          <xProd>SAL REFINADO CISNE 1KG</xProd>
+          <NCM>25010020</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>1.0000</qCom>
+          <vUnCom>3.0222</vUnCom>
+          <vProd>3.02</vProd>
+        </prod>
+      </det>
+      <total>
+        <ICMSTot>
+          <vNF>260.06</vNF>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+</nfeProc>

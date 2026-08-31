@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe>
+    <infNFe Id="NFe35260898765432000188550010000000421000000420" versao="4.00">
+      <ide>
+        <nNF>42</nNF>
+        <serie>1</serie>
+        <dhEmi>2026-08-02T18:00:00-03:00</dhEmi>
+      </ide>
+      <emit>
+        <CNPJ>98765432000188</CNPJ>
+        <xNome>CLIENTE EXEMPLO LTDA</xNome>
+      </emit>
+      <dest>
+        <CNPJ>88999000000148</CNPJ>
+        <xNome>THETA COMERCIO DE ALIMENTOS LTDA</xNome>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>005</cProd>
+          <xProd>CAFE PILAO 500G</xProd>
+          <NCM>09011110</NCM>
+          <CFOP>5102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>15.0000</qCom>
+          <vUnCom>15.4335</vUnCom>
+          <vProd>231.50</vProd>
+        </prod>
+      </det>
+      <det nItem="2">
+        <prod>
+          <cProd>004</cProd>
+          <xProd>OLEO SOJA LIZA 900ML</xProd>
+          <NCM>15071000</NCM>
+          <CFOP>5102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>7.0000</qCom>
+          <vUnCom>9.7282</vUnCom>
+          <vProd>68.10</vProd>
+        </prod>
+      </det>
+      <total>
+        <ICMSTot>
+          <vNF>299.60</vNF>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+</nfeProc>

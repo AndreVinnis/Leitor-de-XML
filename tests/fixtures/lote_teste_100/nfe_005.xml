@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe>
+    <infNFe Id="NFe35260877888999000167550010000000051000000050" versao="4.00">
+      <ide>
+        <nNF>5</nNF>
+        <serie>1</serie>
+        <dhEmi>2026-08-01T05:00:00-03:00</dhEmi>
+      </ide>
+      <emit>
+        <CNPJ>77888999000167</CNPJ>
+        <xNome>COMERCIO ETA LTDA</xNome>
+      </emit>
+      <dest>
+        <CNPJ>98765432000188</CNPJ>
+        <xNome>CLIENTE EXEMPLO LTDA</xNome>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>009</cProd>
+          <xProd>MOLHO TOMATE FUGINI 340G</xProd>
+          <NCM>20029000</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>5.0000</qCom>
+          <vUnCom>3.8082</vUnCom>
+          <vProd>19.04</vProd>
+        </prod>
+      </det>
+      <total>
+        <ICMSTot>
+          <vNF>19.04</vNF>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+</nfeProc>

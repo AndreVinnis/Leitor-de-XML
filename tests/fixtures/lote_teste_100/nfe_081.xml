@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe>
+    <infNFe Id="NFe35260898765432000188550010000000811000000810" versao="4.00">
+      <ide>
+        <nNF>81</nNF>
+        <serie>1</serie>
+        <dhEmi>2026-08-04T09:00:00-03:00</dhEmi>
+      </ide>
+      <emit>
+        <CNPJ>98765432000188</CNPJ>
+        <xNome>CLIENTE EXEMPLO LTDA</xNome>
+      </emit>
+      <dest>
+        <CNPJ>11222333000181</CNPJ>
+        <xNome>DISTRIBUIDORA ALFA LTDA</xNome>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>009</cProd>
+          <xProd>MOLHO TOMATE FUGINI 340G</xProd>
+          <NCM>20029000</NCM>
+          <CFOP>5102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>16.0000</qCom>
+          <vUnCom>3.6790</vUnCom>
+          <vProd>58.86</vProd>
+        </prod>
+      </det>
+      <det nItem="2">
+        <prod>
+          <cProd>003</cProd>
+          <xProd>ACUCAR UNIAO 1KG</xProd>
+          <NCM>17019900</NCM>
+          <CFOP>5102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>3.0000</qCom>
+          <vUnCom>5.3712</vUnCom>
+          <vProd>16.11</vProd>
+        </prod>
+      </det>
+      <det nItem="3">
+        <prod>
+          <cProd>005</cProd>
+          <xProd>CAFE PILAO 500G</xProd>
+          <NCM>09011110</NCM>
+          <CFOP>5102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>18.0000</qCom>
+          <vUnCom>15.8455</vUnCom>
+          <vProd>285.22</vProd>
+        </prod>
+      </det>
+      <total>
+        <ICMSTot>
+          <vNF>360.19</vNF>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+</nfeProc>

@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe>
+    <infNFe Id="NFe35260898765432000188550010000000331000000330" versao="4.00">
+      <ide>
+        <nNF>33</nNF>
+        <serie>1</serie>
+        <dhEmi>2026-08-02T09:00:00-03:00</dhEmi>
+      </ide>
+      <emit>
+        <CNPJ>98765432000188</CNPJ>
+        <xNome>CLIENTE EXEMPLO LTDA</xNome>
+      </emit>
+      <dest>
+        <CNPJ>44555666000124</CNPJ>
+        <xNome>COMERCIAL DELTA EIRELI</xNome>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>005</cProd>
+          <xProd>CAFE PILAO 500G</xProd>
+          <NCM>09011110</NCM>
+          <CFOP>5102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>22.0000</qCom>
+          <vUnCom>14.8708</vUnCom>
+          <vProd>327.16</vProd>
+        </prod>
+      </det>
+      <det nItem="2">
+        <prod>
+          <cProd>003</cProd>
+          <xProd>ACUCAR UNIAO 1KG</xProd>
+          <NCM>17019900</NCM>
+          <CFOP>5102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>3.0000</qCom>
+          <vUnCom>5.2362</vUnCom>
+          <vProd>15.71</vProd>
+        </prod>
+      </det>
+      <det nItem="3">
+        <prod>
+          <cProd>006</cProd>
+          <xProd>LEITE NINHO INTEGRAL 400G</xProd>
+          <NCM>04022110</NCM>
+          <CFOP>5102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>9.0000</qCom>
+          <vUnCom>23.2246</vUnCom>
+          <vProd>209.02</vProd>
+        </prod>
+      </det>
+      <total>
+        <ICMSTot>
+          <vNF>551.89</vNF>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+</nfeProc>

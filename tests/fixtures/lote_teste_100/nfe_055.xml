@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe>
+    <infNFe Id="NFe35260898765432000188550010000000551000000550" versao="4.00">
+      <ide>
+        <nNF>55</nNF>
+        <serie>1</serie>
+        <dhEmi>2026-08-03T07:00:00-03:00</dhEmi>
+      </ide>
+      <emit>
+        <CNPJ>98765432000188</CNPJ>
+        <xNome>CLIENTE EXEMPLO LTDA</xNome>
+      </emit>
+      <dest>
+        <CNPJ>33444555000143</CNPJ>
+        <xNome>MERCADO GAMA SUPERMERCADOS LTDA</xNome>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>011</cProd>
+          <xProd>FARINHA DE TRIGO DONA BENTA 1KG</xProd>
+          <NCM>11010010</NCM>
+          <CFOP>5102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>9.0000</qCom>
+          <vUnCom>6.2672</vUnCom>
+          <vProd>56.40</vProd>
+        </prod>
+      </det>
+      <det nItem="2">
+        <prod>
+          <cProd>009</cProd>
+          <xProd>MOLHO TOMATE FUGINI 340G</xProd>
+          <NCM>20029000</NCM>
+          <CFOP>5102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>28.0000</qCom>
+          <vUnCom>3.8087</vUnCom>
+          <vProd>106.64</vProd>
+        </prod>
+      </det>
+      <total>
+        <ICMSTot>
+          <vNF>163.04</vNF>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+</nfeProc>

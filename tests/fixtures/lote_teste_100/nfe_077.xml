@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe>
+    <infNFe Id="NFe35260888999000000148550010000000771000000770" versao="4.00">
+      <ide>
+        <nNF>77</nNF>
+        <serie>1</serie>
+        <dhEmi>2026-08-04T05:00:00-03:00</dhEmi>
+      </ide>
+      <emit>
+        <CNPJ>88999000000148</CNPJ>
+        <xNome>THETA COMERCIO DE ALIMENTOS LTDA</xNome>
+      </emit>
+      <dest>
+        <CNPJ>98765432000188</CNPJ>
+        <xNome>CLIENTE EXEMPLO LTDA</xNome>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>009</cProd>
+          <xProd>MOLHO TOMATE FUGINI 340G</xProd>
+          <NCM>20029000</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>9.0000</qCom>
+          <vUnCom>3.5748</vUnCom>
+          <vProd>32.17</vProd>
+        </prod>
+      </det>
+      <det nItem="2">
+        <prod>
+          <cProd>006</cProd>
+          <xProd>LEITE NINHO INTEGRAL 400G</xProd>
+          <NCM>04022110</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>8.0000</qCom>
+          <vUnCom>21.9704</vUnCom>
+          <vProd>175.76</vProd>
+        </prod>
+      </det>
+      <det nItem="3">
+        <prod>
+          <cProd>007</cProd>
+          <xProd>MACARRAO BARILLA 500G</xProd>
+          <NCM>19021900</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>5.0000</qCom>
+          <vUnCom>6.3698</vUnCom>
+          <vProd>31.85</vProd>
+        </prod>
+      </det>
+      <total>
+        <ICMSTot>
+          <vNF>239.78</vNF>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+</nfeProc>

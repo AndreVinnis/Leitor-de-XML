@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe>
+    <infNFe Id="NFe35260844555666000124550010000000201000000200" versao="4.00">
+      <ide>
+        <nNF>20</nNF>
+        <serie>1</serie>
+        <dhEmi>2026-08-01T20:00:00-03:00</dhEmi>
+      </ide>
+      <emit>
+        <CNPJ>44555666000124</CNPJ>
+        <xNome>COMERCIAL DELTA EIRELI</xNome>
+      </emit>
+      <dest>
+        <CNPJ>98765432000188</CNPJ>
+        <xNome>CLIENTE EXEMPLO LTDA</xNome>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>002</cProd>
+          <xProd>FEIJAO CARIOCA 1KG</xProd>
+          <NCM>07133399</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>1.0000</qCom>
+          <vUnCom>7.8381</vUnCom>
+          <vProd>7.84</vProd>
+        </prod>
+      </det>
+      <total>
+        <ICMSTot>
+          <vNF>7.84</vNF>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+</nfeProc>

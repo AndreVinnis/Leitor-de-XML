@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe>
+    <infNFe Id="NFe35260855666777000105550010000000841000000840" versao="4.00">
+      <ide>
+        <nNF>84</nNF>
+        <serie>1</serie>
+        <dhEmi>2026-08-04T12:00:00-03:00</dhEmi>
+      </ide>
+      <emit>
+        <CNPJ>55666777000105</CNPJ>
+        <xNome>EPSILON DISTRIBUIDORA S.A.</xNome>
+      </emit>
+      <dest>
+        <CNPJ>98765432000188</CNPJ>
+        <xNome>CLIENTE EXEMPLO LTDA</xNome>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>004</cProd>
+          <xProd>OLEO SOJA LIZA 900ML</xProd>
+          <NCM>15071000</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>2.0000</qCom>
+          <vUnCom>10.0210</vUnCom>
+          <vProd>20.04</vProd>
+        </prod>
+      </det>
+      <total>
+        <ICMSTot>
+          <vNF>20.04</vNF>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+</nfeProc>
