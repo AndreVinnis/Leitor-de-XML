@@ -6,7 +6,8 @@ class Settings(BaseSettings):
     redis_url: str = "redis://redis:6379/0"
     celery_broker_url: str = "redis://redis:6379/0"
     celery_result_backend: str = "redis://redis:6379/1"
-    anthropic_api_key: str = ""
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-2.5-flash"
     secret_key: str = "change-me"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")

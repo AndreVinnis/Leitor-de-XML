@@ -11,7 +11,7 @@ camada de NL→SQL ainda precisam ser implementados.
    ```bash
    cp .env.example .env
    ```
-   Edite `.env` e coloque sua `ANTHROPIC_API_KEY` (não é usada ainda
+   Edite `.env` e coloque sua `GEMINI_API_KEY` (não é usada ainda
    neste scaffold, mas já deixamos o lugar certo para ela).
 
 2. Suba os containers:
