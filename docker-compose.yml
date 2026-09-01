@@ -23,6 +23,13 @@ services:
     ports:
       - "6379:6379"
 
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    restart: unless-stopped
+    ports:
+      - "1025:1025" # SMTP (usado pela API/worker para enviar e-mail)
+      - "8025:8025" # UI web para ver os e-mails capturados
+
   api:
     build:
       context: .
@@ -55,6 +62,8 @@ services:
       db:
         condition: service_healthy
       redis:
+        condition: service_started
+      mailhog:
         condition: service_started
 
 volumes:
