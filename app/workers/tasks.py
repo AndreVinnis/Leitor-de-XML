@@ -1,12 +1,18 @@
 from app.ai.normalizador_produtos import sugerir_normalizacao
+from app.core.config import settings
 from app.core.database import SessionLocal
+from app.core.email import enviar_email
+from app.core.tokens import gerar_token_aprovacao
 from app.models.models import (
     ItemNota,
     Nota,
     ProdutoCanonico,
+    RoleUsuario,
+    StatusCadastro,
     StatusRevisao,
     SugestaoNormalizacao,
     TipoNota,
+    Usuario,
 )
 from app.parsers.nfe_parser import NFeParseError, classificar_tipo, parse_nfe_xml
 from app.workers.celery_app import celery_app
@@ -74,6 +80,78 @@ def processar_xml_nfe(caminho_arquivo: str, cnpj_cliente: str, cliente_caso_id: 
     except Exception as exc:  # noqa: BLE001
         db.rollback()
         return {"status": "erro_inesperado", "arquivo": caminho_arquivo, "motivo": str(exc)}
+    finally:
+        db.close()
+
+
+@celery_app.task(name="enviar_notificacao_novo_cadastro")
+def enviar_notificacao_novo_cadastro(usuario_id: int) -> dict:
+    """
+    Avisa todos os administradores já aprovados sobre um novo cadastro
+    pendente, com links individuais de aprovação/reprovação (token assinado,
+    de uso único e que expira em settings.token_aprovacao_expira_minutos).
+    """
+    db = SessionLocal()
+    try:
+        usuario = db.get(Usuario, usuario_id)
+        if usuario is None:
+            return {"status": "erro", "motivo": "usuário não encontrado"}
+
+        admins = (
+            db.query(Usuario)
+            .filter(Usuario.role == RoleUsuario.ADMINISTRADOR)
+            .filter(Usuario.status_cadastro == StatusCadastro.APROVADO)
+            .all()
+        )
+
+        for admin in admins:
+            token_aprovar = gerar_token_aprovacao(admin.id, usuario.id, "aprovar")
+            token_reprovar = gerar_token_aprovacao(admin.id, usuario.id, "reprovar")
+            link_aprovar = f"{settings.api_base_url}/api/auth/aprovar-cadastro?token={token_aprovar}"
+            link_reprovar = f"{settings.api_base_url}/api/auth/reprovar-cadastro?token={token_reprovar}"
+
+            corpo = (
+                "Novo cadastro aguardando aprovação:\n\n"
+                f"Nome: {usuario.nome}\n"
+                f"E-mail: {usuario.email}\n\n"
+                f"Aprovar: {link_aprovar}\n"
+                f"Reprovar: {link_reprovar}\n\n"
+                f"Este link expira em {settings.token_aprovacao_expira_minutos} minutos."
+            )
+            enviar_email(admin.email, "Novo cadastro aguardando aprovação", corpo)
+
+        return {"status": "ok", "admins_notificados": len(admins)}
+    finally:
+        db.close()
+
+
+@celery_app.task(name="enviar_notificacao_resultado_cadastro")
+def enviar_notificacao_resultado_cadastro(usuario_id: int, aprovado: bool) -> dict:
+    """Avisa o próprio usuário se o cadastro dele foi aprovado ou reprovado."""
+    db = SessionLocal()
+    try:
+        usuario = db.get(Usuario, usuario_id)
+        if usuario is None:
+            return {"status": "erro", "motivo": "usuário não encontrado"}
+
+        if aprovado:
+            assunto = "Seu cadastro foi aprovado"
+            corpo = (
+                f"Olá, {usuario.nome}.\n\n"
+                "Seu cadastro no sistema foi aprovado por um administrador. "
+                "Você já pode fazer login normalmente."
+            )
+        else:
+            assunto = "Seu cadastro não foi aprovado"
+            corpo = (
+                f"Olá, {usuario.nome}.\n\n"
+                "Seu cadastro no sistema não foi aprovado por um administrador. "
+                "Se acredita que isso é um engano, entre em contato com o "
+                "responsável pelo sistema."
+            )
+
+        enviar_email(usuario.email, assunto, corpo)
+        return {"status": "ok"}
     finally:
         db.close()
 
