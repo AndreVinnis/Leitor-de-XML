@@ -1,12 +1,13 @@
 from fastapi import FastAPI
 
-from app.api import routes_produtos, routes_upload
+from app.api import routes_auth, routes_produtos, routes_upload
 
 app = FastAPI(
     title="Sistema de Análise de Notas Fiscais (XML) com IA",
     version="0.1.0",
 )
 
+app.include_router(routes_auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(routes_upload.router, prefix="/api/notas", tags=["notas"])
 app.include_router(routes_produtos.router, prefix="/api/produtos", tags=["produtos"])
 
