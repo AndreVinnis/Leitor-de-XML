@@ -1,0 +1,33 @@
+name: Testes
+
+on:
+  push:
+    branches-ignore:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Instalar dependências de sistema (mysqlclient)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends default-libmysqlclient-dev build-essential pkg-config
+
+      - name: Instalar dependências Python
+        run: pip install -r requirements.txt
+
+      - name: Rodar testes
+        run: pytest -v
