@@ -1,9 +1,9 @@
 from datetime import datetime
 from enum import Enum
 
+from fastapi_users.db import SQLAlchemyBaseUserTable
 from sqlalchemy import (
     JSON,
-    Boolean,
     Column,
     DateTime,
     Enum as SAEnum,
@@ -13,7 +13,7 @@ from sqlalchemy import (
     String,
     Text,
 )
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 
@@ -158,16 +158,38 @@ class ClienteCaso(Base):
     criado_em = Column(DateTime, default=datetime.utcnow)
 
 
-class Usuario(Base):
-    """Advogado/usuário do sistema."""
+class RoleUsuario(str, Enum):
+    COMUM = "comum"
+    ADMINISTRADOR = "administrador"
+
+
+class StatusCadastro(str, Enum):
+    PENDENTE = "pendente"
+    APROVADO = "aprovado"
+    REPROVADO = "reprovado"
+
+
+class Usuario(SQLAlchemyBaseUserTable[int], Base):
+    """
+    Advogado/usuário do sistema. Autenticação via fastapi-users -- os
+    campos email, hashed_password, is_active, is_superuser e is_verified
+    vêm de SQLAlchemyBaseUserTable.
+
+    `is_active` funciona como o "aprovado para logar": nasce False no
+    registro e só vira True quando um administrador aprova o cadastro
+    (ver app/core/auth.py e app/api/routes_auth.py).
+    """
 
     __tablename__ = "usuarios"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     nome = Column(String(255), nullable=False)
-    email = Column(String(255), unique=True, nullable=False, index=True)
-    senha_hash = Column(String(255), nullable=False)
-    ativo = Column(Boolean, default=True)
+    role = Column(SAEnum(RoleUsuario), nullable=False, default=RoleUsuario.COMUM, index=True)
+    status_cadastro = Column(
+        SAEnum(StatusCadastro), nullable=False, default=StatusCadastro.PENDENTE, index=True
+    )
+    aprovado_por_usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+    aprovado_em = Column(DateTime, nullable=True)
     criado_em = Column(DateTime, default=datetime.utcnow)
 
 
