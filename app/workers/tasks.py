@@ -1,7 +1,17 @@
+from app.ai.normalizador_produtos import sugerir_normalizacao
 from app.core.database import SessionLocal
-from app.models.models import ItemNota, Nota, TipoNota
+from app.models.models import (
+    ItemNota,
+    Nota,
+    ProdutoCanonico,
+    StatusRevisao,
+    SugestaoNormalizacao,
+    TipoNota,
+)
 from app.parsers.nfe_parser import NFeParseError, classificar_tipo, parse_nfe_xml
 from app.workers.celery_app import celery_app
+
+TAMANHO_LOTE_IA = 50
 
 
 @celery_app.task(name="processar_xml_nfe")
@@ -64,5 +74,112 @@ def processar_xml_nfe(caminho_arquivo: str, cnpj_cliente: str, cliente_caso_id: 
     except Exception as exc:  # noqa: BLE001
         db.rollback()
         return {"status": "erro_inesperado", "arquivo": caminho_arquivo, "motivo": str(exc)}
+    finally:
+        db.close()
+
+
+def _normalizar_chave(descricao: str) -> str:
+    return descricao.strip().upper()
+
+
+@celery_app.task(name="normalizar_produtos_pendentes")
+def normalizar_produtos_pendentes(cliente_caso_id: int | None = None) -> dict:
+    """
+    Busca itens de nota sem produto_canonico e sem sugestão pendente/já
+    revisada, deduplica pela descrição original e pede à IA para sugerir
+    um produto canônico (existente ou novo) para cada descrição distinta.
+    Cria as SugestaoNormalizacao com status=PENDENTE para revisão humana --
+    a IA nunca grava produto_canonico_id diretamente em itens_nota.
+    """
+    db = SessionLocal()
+    try:
+        query = (
+            db.query(ItemNota)
+            .outerjoin(SugestaoNormalizacao, SugestaoNormalizacao.item_nota_id == ItemNota.id)
+            .filter(ItemNota.produto_canonico_id.is_(None))
+            .filter(SugestaoNormalizacao.id.is_(None))
+        )
+        if cliente_caso_id is not None:
+            query = query.join(Nota, Nota.id == ItemNota.nota_id).filter(
+                Nota.cliente_caso_id == cliente_caso_id
+            )
+
+        itens_pendentes = query.all()
+        if not itens_pendentes:
+            return {"status": "ok", "descricoes_unicas": 0, "sugestoes_criadas": 0}
+
+        # Deduplica por descrição normalizada -- poucas descrições distintas,
+        # muitas notas repetindo a mesma descrição.
+        grupos: dict[str, list[ItemNota]] = {}
+        descricao_original_por_chave: dict[str, str] = {}
+        for item in itens_pendentes:
+            chave = _normalizar_chave(item.descricao_original)
+            grupos.setdefault(chave, []).append(item)
+            descricao_original_por_chave.setdefault(chave, item.descricao_original)
+
+        canonicos_existentes = [
+            {"id": c.id, "nome_canonico": c.nome_canonico, "categoria": c.categoria}
+            for c in db.query(ProdutoCanonico).all()
+        ]
+        ids_canonicos_existentes = {c["id"] for c in canonicos_existentes}
+
+        chaves = list(grupos.keys())
+        sugestoes_criadas = 0
+        produtos_canonicos_criados = 0
+
+        for i in range(0, len(chaves), TAMANHO_LOTE_IA):
+            lote_chaves = chaves[i : i + TAMANHO_LOTE_IA]
+            descricoes_lote = [descricao_original_por_chave[c] for c in lote_chaves]
+
+            resultados = sugerir_normalizacao(descricoes_lote, canonicos_existentes)
+
+            resultados_por_chave = {
+                _normalizar_chave(r.descricao_original): r for r in resultados
+            }
+
+            for chave in lote_chaves:
+                resultado = resultados_por_chave.get(chave)
+                if resultado is None:
+                    continue  # IA não retornou sugestão para essa descrição
+
+                produto_canonico_id = resultado.produto_canonico_id
+                if produto_canonico_id is not None and produto_canonico_id not in ids_canonicos_existentes:
+                    produto_canonico_id = None  # segurança: IA apontou id inexistente
+
+                if produto_canonico_id is None:
+                    if resultado.novo_produto_canonico is None:
+                        continue  # sem correspondência e sem produto novo -- ignora
+                    novo = ProdutoCanonico(
+                        nome_canonico=resultado.novo_produto_canonico.nome_canonico,
+                        categoria=resultado.novo_produto_canonico.categoria,
+                    )
+                    db.add(novo)
+                    db.flush()  # garante novo.id
+                    produto_canonico_id = novo.id
+                    ids_canonicos_existentes.add(produto_canonico_id)
+                    produtos_canonicos_criados += 1
+
+                for item in grupos[chave]:
+                    db.add(
+                        SugestaoNormalizacao(
+                            item_nota_id=item.id,
+                            produto_canonico_sugerido_id=produto_canonico_id,
+                            confianca=resultado.confianca,
+                            status=StatusRevisao.PENDENTE,
+                        )
+                    )
+                    sugestoes_criadas += 1
+
+        db.commit()
+        return {
+            "status": "ok",
+            "descricoes_unicas": len(chaves),
+            "itens_pendentes": len(itens_pendentes),
+            "produtos_canonicos_criados": produtos_canonicos_criados,
+            "sugestoes_criadas": sugestoes_criadas,
+        }
+    except Exception as exc:  # noqa: BLE001
+        db.rollback()
+        return {"status": "erro_inesperado", "motivo": str(exc)}
     finally:
         db.close()
