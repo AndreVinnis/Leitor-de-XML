@@ -1,3 +1,5 @@
+from unittest.mock import MagicMock
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -11,6 +13,21 @@ from app.models import models  # noqa: F401 -- registra as tabelas em Base.metad
 @pytest.fixture
 def anyio_backend():
     return "asyncio"
+
+
+@pytest.fixture(autouse=True)
+def _sem_broker_de_verdade(monkeypatch):
+    """
+    routes_auth._processar_decisao chama enviar_notificacao_resultado_cadastro
+    .delay(...) de verdade -- em CI não existe Redis (só roda `pytest -v`,
+    sem serviço de broker), então isso derrubava os testes do endpoint de
+    aprovação com "Error -3 connecting to redis". Autouse porque qualquer
+    teste que bata nesse endpoint precisa disso, e não custa nada nos que não
+    batem.
+    """
+    monkeypatch.setattr(
+        "app.api.routes_auth.enviar_notificacao_resultado_cadastro", MagicMock()
+    )
 
 
 @pytest.fixture
