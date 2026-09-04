@@ -66,6 +66,25 @@ services:
       mailhog:
         condition: service_started
 
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+    command: streamlit run frontend/streamlit_app.py --server.port 8501 --server.address 0.0.0.0
+    ports:
+      - "8501:8501"
+    environment:
+      # Não usar env_file: .env aqui: o .env define API_BASE_URL para o
+      # backend (http://localhost:8000, usado nos links de aprovação
+      # clicados no navegador do host). Dentro do container do Streamlit,
+      # "localhost" é o próprio container -- a API só é alcançável pelo
+      # nome do serviço na rede do Compose.
+      - API_BASE_URL=http://api:8000
+    volumes:
+      - .:/code
+    depends_on:
+      - api
+
 volumes:
   db_data:
   nfe_uploads:
