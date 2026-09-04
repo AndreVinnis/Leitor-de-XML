@@ -1,4 +1,7 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
+from sqlalchemy import text
 
 from app.api import (
     routes_auth,
@@ -8,10 +11,31 @@ from app.api import (
     routes_produtos,
     routes_upload,
 )
+from app.core.database import async_engine
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Só as rotas do fastapi-users (login, registro, /users/me, redefinição
+    # de senha) usam a engine assíncrona -- o resto do app usa SessionLocal
+    # síncrono. Como ela é criada na importação do módulo mas só abre a
+    # primeira conexão de verdade na primeira requisição, e a API roda com
+    # --reload (reinicia a cada alteração de arquivo), o primeiro login
+    # depois de cada reinício pagava esse custo na hora e às vezes estourava
+    # 500, funcionando só na segunda tentativa. Abrindo e fechando uma
+    # conexão aqui, isso acontece no startup, não na requisição do usuário.
+    try:
+        async with async_engine.connect() as conexao:
+            await conexao.execute(text("SELECT 1"))
+    except Exception:
+        pass  # se o banco ainda não estiver pronto, a API sobe assim mesmo
+    yield
+
 
 app = FastAPI(
     title="Sistema de Análise de Notas Fiscais (XML) com IA",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 app.include_router(routes_auth.router, prefix="/api/auth", tags=["auth"])
