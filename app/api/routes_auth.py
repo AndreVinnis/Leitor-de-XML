@@ -8,13 +8,15 @@ from app.core.auth import auth_backend, fastapi_users
 from app.core.database import SessionLocal
 from app.core.tokens import TokenExpirado, TokenInvalido, verificar_token_aprovacao
 from app.models.models import LogAuditoria, StatusCadastro, Usuario
-from app.schemas.usuario import UsuarioCreate, UsuarioRead
+from app.schemas.usuario import UsuarioCreate, UsuarioRead, UsuarioUpdate
 from app.workers.tasks import enviar_notificacao_resultado_cadastro
 
 router = APIRouter()
 
 router.include_router(fastapi_users.get_auth_router(auth_backend), prefix="/jwt")
 router.include_router(fastapi_users.get_register_router(UsuarioRead, UsuarioCreate))
+router.include_router(fastapi_users.get_users_router(UsuarioRead, UsuarioUpdate), prefix="/users")
+router.include_router(fastapi_users.get_reset_password_router())
 
 
 def _pagina(titulo: str, mensagem: str) -> HTMLResponse:

@@ -4,11 +4,13 @@ from app.core.database import SessionLocal
 from app.core.email import enviar_email
 from app.core.tokens import gerar_token_aprovacao
 from app.models.models import (
+    ArquivoLote,
     ItemNota,
     Nota,
     ProdutoCanonico,
     RoleUsuario,
     StatusCadastro,
+    StatusProcessamento,
     StatusRevisao,
     SugestaoNormalizacao,
     TipoNota,
@@ -20,23 +22,58 @@ from app.workers.celery_app import celery_app
 TAMANHO_LOTE_IA = 50
 
 
+def _atualizar_status_arquivo_lote(db, arquivo_lote_id: int, resultado: dict | None) -> None:
+    """
+    Grava o desfecho do processamento na linha ArquivoLote correspondente.
+    Chamada a partir do `finally` de processar_xml_nfe -- precisa rodar
+    inclusive nos caminhos de exceção, já que um XML que falha no parser
+    nunca vira uma Nota, mas o registro do erro precisa existir do mesmo
+    jeito (é o que alimenta o badge de status por nota e os cards do
+    dashboard).
+    """
+    arquivo_lote = db.get(ArquivoLote, arquivo_lote_id)
+    if arquivo_lote is None:
+        return  # não deveria acontecer, mas não é motivo para derrubar a task
+
+    if resultado is None:
+        # exceção ocorreu antes de qualquer resultado ser montado
+        arquivo_lote.status = StatusProcessamento.ERRO
+        arquivo_lote.motivo_erro = "falha inesperada antes de produzir um resultado"
+    elif resultado["status"] == "ok":
+        arquivo_lote.status = StatusProcessamento.SUCESSO
+        arquivo_lote.nota_id = resultado.get("nota_id")
+    elif resultado["status"] == "ja_existente":
+        arquivo_lote.status = StatusProcessamento.DUPLICADO
+    else:  # "erro" ou "erro_inesperado"
+        arquivo_lote.status = StatusProcessamento.ERRO
+        arquivo_lote.motivo_erro = resultado.get("motivo")
+
+    db.commit()
+
+
 @celery_app.task(name="processar_xml_nfe")
-def processar_xml_nfe(caminho_arquivo: str, cnpj_cliente: str, cliente_caso_id: int) -> dict:
+def processar_xml_nfe(
+    caminho_arquivo: str, cnpj_cliente: str, cliente_caso_id: int, arquivo_lote_id: int
+) -> dict:
     """
     Processa um único arquivo XML de NF-e:
     1. Faz parsing determinístico (sem IA).
     2. Classifica como entrada/saída com base no CNPJ do cliente do caso.
     3. Persiste nota + itens no banco (sem normalização de produto ainda --
        isso acontece em uma etapa posterior, assíncrona também).
+    4. Atualiza o ArquivoLote correspondente (criado antes do enfileiramento,
+       em routes_upload.py) com o desfecho do processamento.
     """
     db = SessionLocal()
+    resultado: dict | None = None
     try:
         nota_dto = parse_nfe_xml(caminho_arquivo)
         tipo = classificar_tipo(nota_dto, cnpj_cliente)
 
         existente = db.query(Nota).filter_by(chave_acesso=nota_dto.chave_acesso).first()
         if existente:
-            return {"status": "ja_existente", "chave_acesso": nota_dto.chave_acesso}
+            resultado = {"status": "ja_existente", "chave_acesso": nota_dto.chave_acesso}
+            return resultado
 
         nota = Nota(
             chave_acesso=nota_dto.chave_acesso,
@@ -72,15 +109,24 @@ def processar_xml_nfe(caminho_arquivo: str, cnpj_cliente: str, cliente_caso_id: 
             )
 
         db.commit()
-        return {"status": "ok", "chave_acesso": nota_dto.chave_acesso, "itens": len(nota_dto.itens)}
+        resultado = {
+            "status": "ok",
+            "chave_acesso": nota_dto.chave_acesso,
+            "itens": len(nota_dto.itens),
+            "nota_id": nota.id,
+        }
+        return resultado
 
     except NFeParseError as exc:
         db.rollback()
-        return {"status": "erro", "arquivo": caminho_arquivo, "motivo": str(exc)}
+        resultado = {"status": "erro", "arquivo": caminho_arquivo, "motivo": str(exc)}
+        return resultado
     except Exception as exc:  # noqa: BLE001
         db.rollback()
-        return {"status": "erro_inesperado", "arquivo": caminho_arquivo, "motivo": str(exc)}
+        resultado = {"status": "erro_inesperado", "arquivo": caminho_arquivo, "motivo": str(exc)}
+        return resultado
     finally:
+        _atualizar_status_arquivo_lote(db, arquivo_lote_id, resultado)
         db.close()
 
 
@@ -151,6 +197,37 @@ def enviar_notificacao_resultado_cadastro(usuario_id: int, aprovado: bool) -> di
             )
 
         enviar_email(usuario.email, assunto, corpo)
+        return {"status": "ok"}
+    finally:
+        db.close()
+
+
+@celery_app.task(name="enviar_email_redefinicao_senha")
+def enviar_email_redefinicao_senha(usuario_id: int, token: str) -> dict:
+    """
+    Envia o e-mail de redefinição de senha, disparado por
+    UserManager.on_after_forgot_password (app/core/auth.py) sempre que
+    POST /api/auth/forgot-password é chamado para um e-mail cadastrado.
+
+    O link aponta para settings.api_base_url + uma rota de frontend
+    ("/redefinir-senha") que ainda não existe -- está fora do escopo atual
+    (só o backend das 4 telas do protótipo). Quando essa tela for
+    construída, o caminho abaixo é o único lugar que precisa mudar.
+    """
+    db = SessionLocal()
+    try:
+        usuario = db.get(Usuario, usuario_id)
+        if usuario is None:
+            return {"status": "erro", "motivo": "usuário não encontrado"}
+
+        link = f"{settings.api_base_url}/redefinir-senha?token={token}"
+        corpo = (
+            f"Olá, {usuario.nome}.\n\n"
+            "Recebemos um pedido para redefinir sua senha. Se foi você, "
+            f"clique no link abaixo:\n\n{link}\n\n"
+            "Se não foi você, ignore este e-mail -- sua senha continua a mesma."
+        )
+        enviar_email(usuario.email, "Redefinição de senha", corpo)
         return {"status": "ok"}
     finally:
         db.close()

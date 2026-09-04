@@ -27,3 +27,20 @@ async def test_on_after_register_desativa_usuario_e_notifica_admins():
 
     user_db.update.assert_awaited_once_with(usuario_fake, {"is_active": False})
     mock_task.delay.assert_called_once_with(42)
+
+
+@pytest.mark.anyio
+async def test_on_after_forgot_password_dispara_task_de_email():
+    """
+    POST /api/auth/forgot-password (fastapi-users) chama esse hook com o
+    token já gerado -- a task só precisa repassar usuario_id + token pro
+    worker montar o e-mail (SMTP síncrono não roda na request async).
+    """
+    user_db = MagicMock()
+    manager = UserManager(user_db)
+    usuario_fake = _UsuarioFake()
+
+    with patch("app.core.auth.enviar_email_redefinicao_senha") as mock_task:
+        await manager.on_after_forgot_password(usuario_fake, "token-abc")
+
+    mock_task.delay.assert_called_once_with(42, "token-abc")
