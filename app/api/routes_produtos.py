@@ -4,18 +4,17 @@ from fastapi import APIRouter, Body
 from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
-from app.models.models import ItemNota, StatusRevisao, SugestaoNormalizacao
+from app.models.models import ItemNota, Nota, StatusRevisao, SugestaoNormalizacao
 from app.workers.tasks import normalizar_produtos_pendentes
 
 router = APIRouter()
 
 
 @router.post("/normalizar")
-async def disparar_normalizacao(cliente_caso_id: int | None = Body(None, embed=True)):
+async def disparar_normalizacao(cliente_caso_id: int = Body(..., embed=True)):
     """
     Dispara, de forma assíncrona, a normalização por IA de todos os itens
-    pendentes (sem produto_canonico e sem sugestão já criada), opcionalmente
-    restrita a um cliente_caso_id.
+    pendentes (sem produto_canonico e sem sugestão já criada) de um caso.
     """
     task = normalizar_produtos_pendentes.delay(cliente_caso_id)
     return {"status": "processando", "task_id": task.id}
@@ -30,21 +29,17 @@ async def status_normalizacao(task_id: str):
 
 
 @router.get("/sugestoes")
-async def listar_sugestoes(status: str = "pendente", cliente_caso_id: int | None = None):
-    """Lista sugestões de normalização (join com o item e a nota) para revisão humana."""
+async def listar_sugestoes(cliente_caso_id: int, status: str = "pendente"):
+    """Lista sugestões de normalização (join com o item e a nota) de um caso, para revisão humana."""
     db: Session = SessionLocal()
     try:
         query = (
             db.query(SugestaoNormalizacao, ItemNota)
             .join(ItemNota, ItemNota.id == SugestaoNormalizacao.item_nota_id)
+            .join(Nota, Nota.id == ItemNota.nota_id)
             .filter(SugestaoNormalizacao.status == StatusRevisao(status))
+            .filter(Nota.cliente_caso_id == cliente_caso_id)
         )
-        if cliente_caso_id is not None:
-            from app.models.models import Nota
-
-            query = query.join(Nota, Nota.id == ItemNota.nota_id).filter(
-                Nota.cliente_caso_id == cliente_caso_id
-            )
 
         resultados = []
         for sugestao, item in query.all():
