@@ -1,7 +1,9 @@
 from unittest.mock import patch
 
+from app.core.config import settings
 from app.models.models import RoleUsuario, StatusCadastro, Usuario
 from app.workers.tasks import (
+    enviar_email_redefinicao_senha,
     enviar_notificacao_novo_cadastro,
     enviar_notificacao_resultado_cadastro,
 )
@@ -93,3 +95,28 @@ def test_notifica_resultado_reprovado(mock_enviar_email, db_session_factory):
     destinatario, assunto, corpo = mock_enviar_email.call_args[0]
     assert destinatario == "ciclano@x.com"
     assert "não foi aprovado" in assunto.lower()
+
+
+@patch("app.workers.tasks.enviar_email")
+def test_envia_email_de_redefinicao_de_senha(mock_enviar_email, db_session_factory):
+    session = db_session_factory()
+    usuario = _criar_usuario(session, "fulano2@x.com", nome="Fulano")
+    session.close()
+
+    resultado = enviar_email_redefinicao_senha(usuario.id, "token-abc")
+
+    assert resultado == {"status": "ok"}
+    destinatario, assunto, corpo = mock_enviar_email.call_args[0]
+    assert destinatario == "fulano2@x.com"
+    assert "token-abc" in corpo
+    assert settings.api_base_url in corpo
+
+
+@patch("app.workers.tasks.enviar_email")
+def test_redefinicao_senha_usuario_inexistente_nao_quebra(mock_enviar_email, db_session_factory):
+    db_session_factory()  # garante as tabelas criadas
+
+    resultado = enviar_email_redefinicao_senha(9999, "token-abc")
+
+    assert resultado["status"] == "erro"
+    mock_enviar_email.assert_not_called()

@@ -168,6 +168,57 @@ class ClienteCaso(Base):
     criado_em = Column(DateTime, default=datetime.utcnow)
 
 
+class StatusProcessamento(str, Enum):
+    PENDENTE = "pendente"
+    SUCESSO = "sucesso"
+    ERRO = "erro"
+    DUPLICADO = "duplicado"
+
+
+class Lote(Base):
+    """
+    Um lote de upload de XMLs (0..N arquivos), disparado por uma chamada de
+    POST /upload. Antes da Etapa 3, o lote_id era um UUID devolvido na
+    resposta e descartado -- sem persistir aqui, os cards do dashboard e o
+    progresso por lote não têm fonte de dados.
+    """
+
+    __tablename__ = "lotes"
+
+    id = Column(String(36), primary_key=True)  # uuid4 gerado na rota de upload
+    cliente_caso_id = Column(Integer, ForeignKey("clientes_casos.id"), nullable=False, index=True)
+    cnpj_cliente = Column(String(14), nullable=False)
+    total_arquivos = Column(Integer, nullable=False)
+    criado_por_usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
+    criado_em = Column(DateTime, default=datetime.utcnow)
+
+    arquivos = relationship("ArquivoLote", back_populates="lote", cascade="all, delete-orphan")
+
+
+class ArquivoLote(Base):
+    """
+    Um arquivo XML dentro de um lote, com o status do seu processamento.
+
+    O status fica aqui, e não em Nota, de propósito: um XML que falha no
+    parser nunca vira uma Nota, mas o registro do erro (motivo_erro) precisa
+    existir mesmo sem nota associada -- é esta linha que alimenta o badge de
+    status por nota e os 3 cards do dashboard.
+    """
+
+    __tablename__ = "arquivos_lote"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    lote_id = Column(String(36), ForeignKey("lotes.id"), nullable=False, index=True)
+    nome_arquivo = Column(String(500), nullable=False)
+    task_id = Column(String(155), nullable=True)  # id da task Celery, preenchido após o enfileiramento
+    status = Column(SAEnum(StatusProcessamento), default=StatusProcessamento.PENDENTE, index=True)
+    motivo_erro = Column(Text, nullable=True)
+    nota_id = Column(Integer, ForeignKey("notas.id"), nullable=True, index=True)
+    criado_em = Column(DateTime, default=datetime.utcnow)
+
+    lote = relationship("Lote", back_populates="arquivos")
+
+
 class RoleUsuario(str, Enum):
     COMUM = "comum"
     ADMINISTRADOR = "administrador"

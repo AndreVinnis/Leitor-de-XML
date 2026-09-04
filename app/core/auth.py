@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.database import get_async_session
 from app.models.models import RoleUsuario, Usuario
-from app.workers.tasks import enviar_notificacao_novo_cadastro
+from app.workers.tasks import enviar_email_redefinicao_senha, enviar_notificacao_novo_cadastro
 
 
 async def get_user_db(session: AsyncSession = Depends(get_async_session)):
@@ -27,6 +27,14 @@ class UserManager(IntegerIDMixin, BaseUserManager[Usuario, int]):
         # (status_cadastro já nasce "pendente" pelo default da coluna).
         await self.user_db.update(user, {"is_active": False})
         enviar_notificacao_novo_cadastro.delay(user.id)
+
+    async def on_after_forgot_password(
+        self, user: Usuario, token: str, request: Optional[Request] = None
+    ) -> None:
+        # Mesmo padrão de on_after_register: o envio de e-mail (SMTP
+        # síncrono) não deve rodar dentro da request assíncrona do
+        # fastapi-users -- delega pro worker.
+        enviar_email_redefinicao_senha.delay(user.id, token)
 
 
 async def get_user_manager(

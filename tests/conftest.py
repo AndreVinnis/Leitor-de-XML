@@ -56,6 +56,10 @@ def db_session_factory(monkeypatch):
     monkeypatch.setattr("app.api.routes_auth.SessionLocal", TestSessionLocal)
     monkeypatch.setattr("app.workers.tasks.SessionLocal", TestSessionLocal)
     monkeypatch.setattr("app.api.routes_produtos.SessionLocal", TestSessionLocal)
+    monkeypatch.setattr("app.api.routes_casos.SessionLocal", TestSessionLocal)
+    monkeypatch.setattr("app.api.routes_upload.SessionLocal", TestSessionLocal)
+    monkeypatch.setattr("app.api.routes_notas.SessionLocal", TestSessionLocal)
+    monkeypatch.setattr("app.api.routes_dashboard.SessionLocal", TestSessionLocal)
 
     yield TestSessionLocal
 
@@ -68,3 +72,24 @@ def client():
     from app.main import app
 
     return TestClient(app)
+
+
+@pytest.fixture
+def logar_usuario():
+    """
+    Sobrescreve a dependência usuario_atual_ativo (fastapi-users, que roda
+    no engine async) para simular um usuário logado nas rotas de negócio,
+    sem precisar gerar um JWT de verdade. `client` é scope="session", então
+    não dá pra usar monkeypatch aqui -- o override é global no app e
+    precisa ser limpo no teardown de cada teste pra não vazar pros outros.
+    """
+    from app.core.auth import usuario_atual_ativo
+    from app.main import app
+
+    def _logar(usuario):
+        app.dependency_overrides[usuario_atual_ativo] = lambda: usuario
+        return usuario
+
+    yield _logar
+
+    app.dependency_overrides.pop(usuario_atual_ativo, None)
