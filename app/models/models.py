@@ -12,6 +12,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -77,11 +78,19 @@ class ProdutoCanonico(Base):
     Produto 'normalizado'. Várias descrições diferentes de itens (xProd)
     apontam para o mesmo produto_canonico após normalização por IA +
     revisão humana.
+
+    Escopado por cliente_caso_id: cada caso tem seu próprio catálogo de
+    canônicos, para não misturar vocabulário/dados de produto entre clientes
+    distintos (ver AchadoReconciliacao, que já assume esse mesmo escopo).
     """
 
     __tablename__ = "produtos_canonicos"
+    __table_args__ = (
+        UniqueConstraint("cliente_caso_id", "nome_canonico", name="uq_produto_canonico_caso_nome"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    cliente_caso_id = Column(Integer, ForeignKey("clientes_casos.id"), nullable=False, index=True)
     nome_canonico = Column(String(255), nullable=False, index=True)
     categoria = Column(String(120), nullable=True, index=True)
     # Embeddings: decisão em aberto (JSON aqui é um placeholder simples;
@@ -89,6 +98,7 @@ class ProdutoCanonico(Base):
     embedding = Column(JSON, nullable=True)
     criado_em = Column(DateTime, default=datetime.utcnow)
 
+    cliente_caso = relationship("ClienteCaso")
     itens = relationship("ItemNota", back_populates="produto_canonico")
 
 
