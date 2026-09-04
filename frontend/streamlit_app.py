@@ -11,7 +11,7 @@ nunca chamar a função de uma tela autenticada sem token na sessão.
 import streamlit as st
 
 from api_client import ErroApi, criar_caso, listar_casos
-from paginas import criar_conta, dashboard, login, normalizacao
+from paginas import consulta, criar_conta, dashboard, login, normalizacao
 
 st.set_page_config(
     page_title="Leitor de XML -- Teste de Integração",
@@ -57,6 +57,9 @@ def _sidebar_autenticada() -> None:
             st.rerun()
         if st.button("Normalização de Produtos", use_container_width=True):
             st.session_state["pagina"] = "normalizacao"
+            st.rerun()
+        if st.button("Consulta", use_container_width=True):
+            st.session_state["pagina"] = "consulta"
             st.rerun()
         if st.button("Sair", use_container_width=True):
             st.session_state["token"] = None
@@ -116,6 +119,8 @@ def main() -> None:
     pagina = st.session_state["pagina"]
     if pagina == "normalizacao":
         normalizacao.exibir()
+    elif pagina == "consulta":
+        consulta.exibir()
     else:
         dashboard.exibir()
 
