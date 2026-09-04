@@ -55,6 +55,7 @@ def db_session_factory(monkeypatch):
 
     monkeypatch.setattr("app.api.routes_auth.SessionLocal", TestSessionLocal)
     monkeypatch.setattr("app.workers.tasks.SessionLocal", TestSessionLocal)
+    monkeypatch.setattr("app.api.routes_produtos.SessionLocal", TestSessionLocal)
 
     yield TestSessionLocal
 

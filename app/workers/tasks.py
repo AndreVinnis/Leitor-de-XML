@@ -161,28 +161,29 @@ def _normalizar_chave(descricao: str) -> str:
 
 
 @celery_app.task(name="normalizar_produtos_pendentes")
-def normalizar_produtos_pendentes(cliente_caso_id: int | None = None) -> dict:
+def normalizar_produtos_pendentes(cliente_caso_id: int) -> dict:
     """
     Busca itens de nota sem produto_canonico e sem sugestão pendente/já
     revisada, deduplica pela descrição original e pede à IA para sugerir
     um produto canônico (existente ou novo) para cada descrição distinta.
     Cria as SugestaoNormalizacao com status=PENDENTE para revisão humana --
     a IA nunca grava produto_canonico_id diretamente em itens_nota.
+
+    Escopado por cliente_caso_id: tanto os itens pendentes quanto o catálogo
+    de canônicos existentes usado como contexto para a IA são restritos ao
+    caso, para não misturar vocabulário/dados de produto entre clientes.
     """
     db = SessionLocal()
     try:
-        query = (
+        itens_pendentes = (
             db.query(ItemNota)
+            .join(Nota, Nota.id == ItemNota.nota_id)
             .outerjoin(SugestaoNormalizacao, SugestaoNormalizacao.item_nota_id == ItemNota.id)
             .filter(ItemNota.produto_canonico_id.is_(None))
             .filter(SugestaoNormalizacao.id.is_(None))
+            .filter(Nota.cliente_caso_id == cliente_caso_id)
+            .all()
         )
-        if cliente_caso_id is not None:
-            query = query.join(Nota, Nota.id == ItemNota.nota_id).filter(
-                Nota.cliente_caso_id == cliente_caso_id
-            )
-
-        itens_pendentes = query.all()
         if not itens_pendentes:
             return {"status": "ok", "descricoes_unicas": 0, "sugestoes_criadas": 0}
 
@@ -197,7 +198,9 @@ def normalizar_produtos_pendentes(cliente_caso_id: int | None = None) -> dict:
 
         canonicos_existentes = [
             {"id": c.id, "nome_canonico": c.nome_canonico, "categoria": c.categoria}
-            for c in db.query(ProdutoCanonico).all()
+            for c in db.query(ProdutoCanonico)
+            .filter(ProdutoCanonico.cliente_caso_id == cliente_caso_id)
+            .all()
         ]
         ids_canonicos_existentes = {c["id"] for c in canonicos_existentes}
 
@@ -228,6 +231,7 @@ def normalizar_produtos_pendentes(cliente_caso_id: int | None = None) -> dict:
                     if resultado.novo_produto_canonico is None:
                         continue  # sem correspondência e sem produto novo -- ignora
                     novo = ProdutoCanonico(
+                        cliente_caso_id=cliente_caso_id,
                         nome_canonico=resultado.novo_produto_canonico.nome_canonico,
                         categoria=resultado.novo_produto_canonico.categoria,
                     )
