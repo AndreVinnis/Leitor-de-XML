@@ -63,6 +63,123 @@ async def listar_canonicos(
         db.close()
 
 
+@router.post("/canonicos")
+async def criar_canonico(
+    cliente_caso_id: int = Body(..., embed=True),
+    nome_canonico: str = Body(..., embed=True),
+    categoria: str | None = Body(None, embed=True),
+    usuario: Usuario = Depends(usuario_atual_ativo),
+):
+    """
+    Cria manualmente um produto canônico (fora do fluxo de sugestão da IA) --
+    usado, por exemplo, quando o revisor escolhe "+ Criar novo" ao corrigir
+    uma sugestão. Checa duplicidade antes de inserir para devolver 400 em vez
+    de deixar estourar a UniqueConstraint uq_produto_canonico_caso_nome.
+    """
+    db: Session = SessionLocal()
+    try:
+        existente = (
+            db.query(ProdutoCanonico)
+            .filter(
+                ProdutoCanonico.cliente_caso_id == cliente_caso_id,
+                ProdutoCanonico.nome_canonico == nome_canonico,
+            )
+            .first()
+        )
+        if existente is not None:
+            raise HTTPException(
+                status_code=400,
+                detail=f"já existe um produto canônico '{nome_canonico}' para o caso {cliente_caso_id}",
+            )
+
+        canonico = ProdutoCanonico(
+            cliente_caso_id=cliente_caso_id, nome_canonico=nome_canonico, categoria=categoria
+        )
+        db.add(canonico)
+        db.flush()  # popula canonico.id antes do log e do retorno, sem commitar ainda
+
+        db.add(
+            LogAuditoria(
+                usuario_id=usuario.id,
+                acao="criacao_produto_canonico",
+                resultado_resumo=(
+                    f"Produto canônico {canonico.id} criado: nome '{nome_canonico}', "
+                    f"categoria '{categoria}', caso {cliente_caso_id}"
+                ),
+            )
+        )
+        db.commit()
+        return {"id": canonico.id, "nome_canonico": canonico.nome_canonico, "categoria": canonico.categoria}
+    finally:
+        db.close()
+
+
+@router.patch("/canonicos/{produto_canonico_id}")
+async def editar_canonico(
+    produto_canonico_id: int,
+    nome_canonico: str | None = Body(None, embed=True),
+    categoria: str | None = Body(None, embed=True),
+    usuario: Usuario = Depends(usuario_atual_ativo),
+):
+    """
+    Edita nome e/ou categoria de um produto canônico existente, com log de
+    auditoria. `categoria=""` limpa o campo (vira NULL) -- diferente de
+    categoria omitido/None, que significa "não mexer nesse campo".
+    """
+    if nome_canonico is None and categoria is None:
+        raise HTTPException(status_code=400, detail="informe nome_canonico e/ou categoria")
+
+    db: Session = SessionLocal()
+    try:
+        canonico = db.get(ProdutoCanonico, produto_canonico_id)
+        if canonico is None:
+            raise HTTPException(status_code=404, detail="produto canônico não encontrado")
+
+        nome_antigo = canonico.nome_canonico
+        categoria_antiga = canonico.categoria
+        mudancas = []
+
+        if nome_canonico is not None and nome_canonico != nome_antigo:
+            conflito = (
+                db.query(ProdutoCanonico)
+                .filter(
+                    ProdutoCanonico.cliente_caso_id == canonico.cliente_caso_id,
+                    ProdutoCanonico.nome_canonico == nome_canonico,
+                    ProdutoCanonico.id != produto_canonico_id,
+                )
+                .first()
+            )
+            if conflito is not None:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"já existe um produto canônico '{nome_canonico}' para este caso",
+                )
+            mudancas.append(f"nome '{nome_antigo}'->'{nome_canonico}'")
+            canonico.nome_canonico = nome_canonico
+
+        if categoria is not None:
+            categoria_nova = None if categoria == "" else categoria
+            if categoria_nova != categoria_antiga:
+                mudancas.append(f"categoria '{categoria_antiga}'->'{categoria_nova}'")
+                canonico.categoria = categoria_nova
+
+        if mudancas:
+            db.add(
+                LogAuditoria(
+                    usuario_id=usuario.id,
+                    acao="edicao_produto_canonico",
+                    resultado_resumo=(
+                        f"Produto canônico {produto_canonico_id} editado: " + ", ".join(mudancas)
+                    ),
+                )
+            )
+
+        db.commit()
+        return {"id": canonico.id, "nome_canonico": canonico.nome_canonico, "categoria": canonico.categoria}
+    finally:
+        db.close()
+
+
 @router.get("/sugestoes")
 async def listar_sugestoes(
     cliente_caso_id: int,
@@ -140,17 +257,33 @@ async def listar_sugestoes(
         db.close()
 
 
-def _revisar(db: Session, sugestao_id: int, usuario_id: int, confirmado: bool) -> dict:
+def _revisar(
+    db: Session,
+    sugestao_id: int,
+    usuario_id: int,
+    confirmado: bool,
+    produto_canonico_override_id: int | None = None,
+) -> dict:
     """
     Fluxo compartilhado por confirmar/rejeitar, unitário ou em lote: marca o
     status da sugestão, grava quem/quando revisou, propaga
     produto_canonico_id ao item quando confirmado, e registra o LogAuditoria
     correspondente. Não commita -- quem chama decide o momento (uma sugestão
     por vez ou um lote inteiro em uma única transação).
+
+    `produto_canonico_override_id`: usado só pelo fluxo de "corrigir"
+    (escolher outro canônico que não o sugerido pela IA). Quando presente,
+    exige que a sugestão ainda esteja PENDENTE (corrigir só faz sentido
+    antes de uma decisão já tomada) e NÃO altera
+    produto_canonico_sugerido_id -- só o produto_canonico_id do item, para
+    preservar o que a IA sugeriu originalmente.
     """
     sugestao = db.get(SugestaoNormalizacao, sugestao_id)
     if sugestao is None:
         return {"status": "erro", "motivo": "sugestão não encontrada"}
+
+    if produto_canonico_override_id is not None and sugestao.status != StatusRevisao.PENDENTE:
+        return {"status": "erro", "motivo": "sugestão não está pendente"}
 
     sugestao.status = StatusRevisao.CONFIRMADO if confirmado else StatusRevisao.REJEITADO
     sugestao.revisado_por_usuario_id = usuario_id
@@ -159,12 +292,24 @@ def _revisar(db: Session, sugestao_id: int, usuario_id: int, confirmado: bool) -
     item = db.get(ItemNota, sugestao.item_nota_id)
 
     if confirmado:
-        item.produto_canonico_id = sugestao.produto_canonico_sugerido_id
-        acao = "confirmacao_sugestao_normalizacao"
-        resumo = (
-            f"Sugestão {sugestao_id} confirmada: item '{item.descricao_original}' "
-            f"-> produto canônico {item.produto_canonico_id}"
+        produto_id = (
+            produto_canonico_override_id
+            if produto_canonico_override_id is not None
+            else sugestao.produto_canonico_sugerido_id
         )
+        item.produto_canonico_id = produto_id
+        if produto_canonico_override_id is not None:
+            acao = "correcao_sugestao_normalizacao"
+            resumo = (
+                f"Sugestão {sugestao_id} corrigida: IA sugeriu produto canônico "
+                f"{sugestao.produto_canonico_sugerido_id}, usuário escolheu {produto_id}"
+            )
+        else:
+            acao = "confirmacao_sugestao_normalizacao"
+            resumo = (
+                f"Sugestão {sugestao_id} confirmada: item '{item.descricao_original}' "
+                f"-> produto canônico {item.produto_canonico_id}"
+            )
     else:
         acao = "rejeicao_sugestao_normalizacao"
         resumo = f"Sugestão {sugestao_id} rejeitada"
@@ -224,6 +369,47 @@ async def rejeitar_sugestao(
     db: Session = SessionLocal()
     try:
         resultado = _revisar(db, sugestao_id, usuario.id, confirmado=False)
+        db.commit()
+        return resultado
+    finally:
+        db.close()
+
+
+@router.post("/sugestoes/{sugestao_id}/corrigir")
+async def corrigir_sugestao(
+    sugestao_id: int,
+    produto_canonico_id: int = Body(..., embed=True),
+    usuario: Usuario = Depends(usuario_atual_ativo),
+):
+    """
+    Escolhe, para uma sugestão pendente, um produto canônico diferente do
+    sugerido pela IA (existente ou recém-criado via POST /canonicos). O
+    produto_canonico_sugerido_id da sugestão não muda -- só o
+    produto_canonico_id do item passa a apontar para a escolha do usuário.
+    """
+    db: Session = SessionLocal()
+    try:
+        sugestao = db.get(SugestaoNormalizacao, sugestao_id)
+        if sugestao is None:
+            return {"status": "erro", "motivo": "sugestão não encontrada"}
+
+        item = db.get(ItemNota, sugestao.item_nota_id)
+        nota = db.get(Nota, item.nota_id)
+
+        canonico_escolhido = db.get(ProdutoCanonico, produto_canonico_id)
+        if canonico_escolhido is None or canonico_escolhido.cliente_caso_id != nota.cliente_caso_id:
+            raise HTTPException(
+                status_code=400,
+                detail="produto_canonico_id inválido para o caso deste item",
+            )
+
+        resultado = _revisar(
+            db,
+            sugestao_id,
+            usuario.id,
+            confirmado=True,
+            produto_canonico_override_id=produto_canonico_id,
+        )
         db.commit()
         return resultado
     finally:
