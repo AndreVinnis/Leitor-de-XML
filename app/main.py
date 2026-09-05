@@ -6,6 +6,7 @@ from sqlalchemy import text
 from app.api import (
     routes_auth,
     routes_casos,
+    routes_consulta,
     routes_dashboard,
     routes_notas,
     routes_produtos,
@@ -44,6 +45,7 @@ app.include_router(routes_notas.router, prefix="/api/notas", tags=["notas"])
 app.include_router(routes_produtos.router, prefix="/api/produtos", tags=["produtos"])
 app.include_router(routes_casos.router, prefix="/api/casos", tags=["casos"])
 app.include_router(routes_dashboard.router, prefix="/api/dashboard", tags=["dashboard"])
+app.include_router(routes_consulta.router, prefix="/api/consulta", tags=["consulta"])
 
 
 @app.get("/health")

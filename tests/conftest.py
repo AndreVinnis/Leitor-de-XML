@@ -60,6 +60,7 @@ def db_session_factory(monkeypatch):
     monkeypatch.setattr("app.api.routes_upload.SessionLocal", TestSessionLocal)
     monkeypatch.setattr("app.api.routes_notas.SessionLocal", TestSessionLocal)
     monkeypatch.setattr("app.api.routes_dashboard.SessionLocal", TestSessionLocal)
+    monkeypatch.setattr("app.api.routes_consulta.SessionLocal", TestSessionLocal)
 
     yield TestSessionLocal
 

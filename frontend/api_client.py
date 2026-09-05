@@ -300,3 +300,21 @@ def rejeitar_sugestoes_lote(ids: list[int]) -> dict:
         timeout=TIMEOUT_PADRAO,
     )
     return _tratar_resposta(resposta)
+
+
+# --------------------------------------------------------------------------
+# Consulta em linguagem natural (app/api/routes_consulta.py)
+# --------------------------------------------------------------------------
+
+def consultar(pergunta: str, cliente_caso_id: int) -> dict:
+    """POST /api/consulta devolve 422 (via ErroApi) quando a IA gera um SQL
+    que não passa na validação de segurança -- a tela mostra erro.detalhe
+    nesse caso, não é uma falha de comunicação. Timeout maior que o padrão
+    porque a rota chama o Gemini antes de consultar o banco."""
+    resposta = requests.post(
+        f"{BASE_URL}/api/consulta",
+        json={"pergunta": pergunta, "cliente_caso_id": cliente_caso_id},
+        headers=_cabecalhos(),
+        timeout=60,
+    )
+    return _tratar_resposta(resposta)
