@@ -6,7 +6,7 @@ from app.ai.consulta_nl_sql import gerar_sql
 from app.core.auth import usuario_atual_ativo
 from app.core.database import SessionLocal
 from app.core.sql_seguranca import SqlInseguro, validar_e_finalizar_sql
-from app.models.models import LogAuditoria, Usuario
+from app.models.models import LogAuditoria, ProdutoCanonico, Usuario
 
 router = APIRouter()
 
@@ -23,10 +23,20 @@ async def consultar(
     e executa escopado por cliente_caso_id. Toda consulta -- bloqueada ou
     não -- fica registrada em log_auditoria (RF-010).
     """
-    sql_bruto = gerar_sql(pergunta)
-
     db: Session = SessionLocal()
     try:
+        canonicos = (
+            db.query(ProdutoCanonico)
+            .filter(ProdutoCanonico.cliente_caso_id == cliente_caso_id)
+            .all()
+        )
+        canonicos_existentes = [
+            {"id": c.id, "nome_canonico": c.nome_canonico, "categoria": c.categoria}
+            for c in canonicos
+        ]
+
+        sql_bruto = gerar_sql(pergunta, canonicos_existentes)
+
         try:
             sql_final = validar_e_finalizar_sql(sql_bruto)
         except SqlInseguro as erro:

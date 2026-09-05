@@ -54,17 +54,48 @@ valor real é injetado depois pelo backend.
 produtos_canonicos (por produto_canonico_id) e/ou notas (por nota_id) \
 conforme necessário para responder quantidade, valor total, preço e \
 categoria.
-- Não use nenhuma tabela ou coluna fora da lista acima."""
+- Não use nenhuma tabela ou coluna fora da lista acima.
+
+Você recebe também a lista de produtos canônicos já cadastrados no caso (id, \
+nome_canonico, categoria) -- são os nomes revisados por humano, e a grafia \
+usada nas notas fiscais originais (itens_nota.descricao_original) costuma \
+variar bastante em relação a eles (abreviação, acentuação, plural, marca vs. \
+nome genérico etc.). Se a pergunta mencionar um produto que corresponda, \
+mesmo com grafia diferente, a algum item dessa lista, filtre por \
+itens_nota.produto_canonico_id = <id> (ou IN (...) para mais de um) em vez \
+de tentar casar o texto exato da pergunta contra descricao_original -- isso \
+evita falso-negativo por diferença de grafia entre a pergunta e a nota \
+fiscal. Só recorra a LIKE sobre descricao_original/nome_canonico quando não \
+houver nenhuma correspondência razoável na lista de canônicos."""
 
 
-def gerar_sql(pergunta: str) -> str:
-    """Chama a IA para traduzir `pergunta` em um SQL bruto (ainda não
-    validado -- ver o aviso no topo do módulo)."""
+def gerar_sql(pergunta: str, canonicos_existentes: list[dict]) -> str:
+    """
+    Chama a IA para traduzir `pergunta` em um SQL bruto (ainda não validado
+    -- ver o aviso no topo do módulo).
+
+    `canonicos_existentes` é a lista de {"id": int, "nome_canonico": str,
+    "categoria": str | None} já cadastrados no caso (mesmo formato usado por
+    app.ai.normalizador_produtos.sugerir_normalizacao), dada como contexto
+    para a IA resolver produtos mencionados na pergunta com grafia diferente
+    da nota fiscal original para o nome canônico correto.
+    """
     client = _get_client()
+
+    canonicos_texto = "\n".join(
+        f"- id={c['id']}: {c['nome_canonico']}"
+        + (f" (categoria: {c['categoria']})" if c.get("categoria") else "")
+        for c in canonicos_existentes
+    ) or "(nenhum produto canônico cadastrado ainda neste caso)"
+
+    user_message = (
+        f"Produtos canônicos já cadastrados neste caso:\n{canonicos_texto}\n\n"
+        f"Pergunta: {pergunta}"
+    )
 
     response = client.models.generate_content(
         model=settings.gemini_model,
-        contents=pergunta,
+        contents=user_message,
         config=types.GenerateContentConfig(
             system_instruction=_SYSTEM_PROMPT,
             response_mime_type="application/json",

@@ -75,9 +75,13 @@ def test_consulta_caminho_feliz_executa_sql_e_grava_log(
         "JOIN itens_nota i ON i.nota_id = n.id "
         "WHERE n.cliente_caso_id = :cliente_caso_id"
     )
-    monkeypatch.setattr(
-        "app.api.routes_consulta.gerar_sql", lambda pergunta: sql_fixo
-    )
+    chamadas = []
+
+    def _gerar_sql_fake(pergunta, canonicos_existentes):
+        chamadas.append((pergunta, canonicos_existentes))
+        return sql_fixo
+
+    monkeypatch.setattr("app.api.routes_consulta.gerar_sql", _gerar_sql_fake)
 
     resp = client.post(
         "/api/consulta",
@@ -99,6 +103,13 @@ def test_consulta_caminho_feliz_executa_sql_e_grava_log(
     assert "1 linha" in log.resultado_resumo
     session.close()
 
+    assert len(chamadas) == 1
+    pergunta_recebida, canonicos_recebidos = chamadas[0]
+    assert pergunta_recebida == "quais notas tem arroz?"
+    assert canonicos_recebidos == [
+        {"id": item.produto_canonico_id, "nome_canonico": "Arroz 5kg", "categoria": None}
+    ]
+
 
 def test_consulta_bloqueada_por_sql_inseguro_retorna_422_e_grava_log(
     client, db_session_factory, logar_usuario, monkeypatch
@@ -114,7 +125,8 @@ def test_consulta_bloqueada_por_sql_inseguro_retorna_422_e_grava_log(
         "DROP TABLE notas"
     )
     monkeypatch.setattr(
-        "app.api.routes_consulta.gerar_sql", lambda pergunta: sql_inseguro
+        "app.api.routes_consulta.gerar_sql",
+        lambda pergunta, canonicos_existentes: sql_inseguro,
     )
 
     resp = client.post(
