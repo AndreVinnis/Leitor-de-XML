@@ -231,6 +231,48 @@ def listar_canonicos(cliente_caso_id: int) -> list:
     return _tratar_resposta(resposta)
 
 
+def criar_canonico(cliente_caso_id: int, nome_canonico: str, categoria: str | None = None) -> dict:
+    """POST /api/produtos/canonicos: cria manualmente um canônico (ex.: opção
+    "+ Criar novo" ao corrigir uma sugestão). Devolve o produto criado, com id."""
+    resposta = requests.post(
+        f"{BASE_URL}/api/produtos/canonicos",
+        json={
+            "cliente_caso_id": cliente_caso_id,
+            "nome_canonico": nome_canonico,
+            "categoria": categoria,
+        },
+        headers=_cabecalhos(),
+        timeout=TIMEOUT_PADRAO,
+    )
+    return _tratar_resposta(resposta)
+
+
+def editar_canonico(
+    produto_canonico_id: int, nome_canonico: str | None = None, categoria: str | None = None
+) -> dict:
+    """PATCH /api/produtos/canonicos/{id}: envia só os campos informados.
+    categoria="" limpa o campo; categoria=None significa "não mexer"."""
+    resposta = requests.patch(
+        f"{BASE_URL}/api/produtos/canonicos/{produto_canonico_id}",
+        json={"nome_canonico": nome_canonico, "categoria": categoria},
+        headers=_cabecalhos(),
+        timeout=TIMEOUT_PADRAO,
+    )
+    return _tratar_resposta(resposta)
+
+
+def corrigir_sugestao(sugestao_id: int, produto_canonico_id: int) -> dict:
+    """POST /api/produtos/sugestoes/{id}/corrigir: mesma lógica de "200
+    mesmo com erro" das demais rotas de revisão (confirmar/rejeitar)."""
+    resposta = requests.post(
+        f"{BASE_URL}/api/produtos/sugestoes/{sugestao_id}/corrigir",
+        json={"produto_canonico_id": produto_canonico_id},
+        headers=_cabecalhos(),
+        timeout=TIMEOUT_PADRAO,
+    )
+    return _tratar_resposta(resposta)
+
+
 def listar_sugestoes(
     cliente_caso_id: int,
     status: str = "pendente",

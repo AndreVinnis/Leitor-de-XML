@@ -5,7 +5,10 @@ from api_client import (
     ErroApi,
     confirmar_sugestao,
     confirmar_sugestoes_lote,
+    corrigir_sugestao,
+    criar_canonico,
     disparar_normalizacao,
+    editar_canonico,
     listar_canonicos,
     listar_sugestoes,
     rejeitar_sugestao,
@@ -39,6 +42,8 @@ def exibir() -> None:
     _exibir_disparo(caso_id)
     st.divider()
     _exibir_lista(caso_id)
+    st.divider()
+    _exibir_canonicos(caso_id)
 
 
 def _exibir_disparo(caso_id: int) -> None:
@@ -174,15 +179,15 @@ def _exibir_lista(caso_id: int) -> None:
     # tabela sem widget não comporta um botão por célula. Os botões de ação
     # em lote acima exercitam as rotas de LOTE -- cobrir os dois caminhos é
     # o objetivo desta tela.
-    cabecalho = st.columns([0.5, 3, 2, 1.5, 1, 1, 0.6, 0.6])
+    cabecalho = st.columns([0.5, 3, 2, 1.5, 1, 1, 0.6, 0.6, 0.6])
     for coluna, titulo in zip(
         cabecalho,
-        ["", "Descrição original", "Nome canônico", "Categoria", "Confiança", "Status", "", ""],
+        ["", "Descrição original", "Nome canônico", "Categoria", "Confiança", "Status", "", "", ""],
     ):
         coluna.markdown(f"**{titulo}**")
 
     for item in itens:
-        linha = st.columns([0.5, 3, 2, 1.5, 1, 1, 0.6, 0.6])
+        linha = st.columns([0.5, 3, 2, 1.5, 1, 1, 0.6, 0.6, 0.6])
         linha[0].checkbox("", key=f"sel_{item['id']}", label_visibility="collapsed")
         linha[1].write(item["descricao_original"])
         linha[2].write(item["nome_canonico"])
@@ -201,6 +206,18 @@ def _exibir_lista(caso_id: int) -> None:
             "✕", key=f"rejeitar_{item['id']}", help="Rejeitar sugestão", disabled=ja_revisada
         ):
             _executar_acao_unitaria(rejeitar_sugestao, item["id"])
+        if linha[8].button(
+            "✎", key=f"corrigir_{item['id']}", help="Escolher outro produto canônico", disabled=ja_revisada
+        ):
+            chave_aberto = f"corrigir_aberto_{item['id']}"
+            st.session_state[chave_aberto] = not st.session_state.get(chave_aberto, False)
+            st.rerun()
+
+        # Bloco de correção, aberto/fechado via session_state (mesmo padrão
+        # de mensagens_revisao) para sobreviver ao rerun disparado pelo
+        # próprio botão ✎ que o abre/fecha.
+        if st.session_state.get(f"corrigir_aberto_{item['id']}"):
+            _exibir_correcao_sugestao(item, canonicos)
 
     col_prev, col_next = st.columns(2)
     with col_prev:
@@ -211,6 +228,156 @@ def _exibir_lista(caso_id: int) -> None:
         if offset + LIMITE_SUGESTOES < total and st.button("Próxima página", key="sug_next"):
             st.session_state["sugestoes_offset"] = offset + LIMITE_SUGESTOES
             st.rerun()
+
+
+def _exibir_correcao_sugestao(item: dict, canonicos: list) -> None:
+    """
+    Bloco inline (aberto pelo botão ✎ da linha) para escolher, numa sugestão
+    ainda pendente, um produto canônico diferente do sugerido pela IA --
+    existente (selectbox) ou recém-criado ("+ Criar novo", que revela os
+    campos de nome/categoria).
+    """
+    opcoes = [c["id"] for c in canonicos] + ["novo"]
+    rotulos = {
+        c["id"]: f"{c['nome_canonico']} ({c['categoria'] or 'sem categoria'})" for c in canonicos
+    }
+    rotulos["novo"] = "+ Criar novo"
+
+    sugerido_id = item["produto_canonico_sugerido_id"]
+    indice_padrao = opcoes.index(sugerido_id) if sugerido_id in opcoes else 0
+
+    with st.container(border=True):
+        st.caption(f"Corrigir sugestão {item['id']}: escolha outro produto canônico")
+        escolha = st.selectbox(
+            "Produto canônico",
+            opcoes,
+            index=indice_padrao,
+            format_func=lambda v: rotulos.get(v, str(v)),
+            key=f"corrigir_select_{item['id']}",
+        )
+
+        nome_novo = ""
+        categoria_novo = ""
+        if escolha == "novo":
+            col_nome, col_categoria = st.columns(2)
+            with col_nome:
+                nome_novo = st.text_input("Nome canônico", key=f"corrigir_nome_novo_{item['id']}")
+            with col_categoria:
+                categoria_novo = st.text_input(
+                    "Categoria", key=f"corrigir_categoria_novo_{item['id']}"
+                )
+
+        col_confirmar, col_cancelar = st.columns(2)
+        with col_confirmar:
+            if st.button("Confirmar correção", key=f"corrigir_confirmar_{item['id']}"):
+                _executar_correcao(item["id"], escolha, nome_novo, categoria_novo)
+        with col_cancelar:
+            if st.button("Cancelar", key=f"corrigir_cancelar_{item['id']}"):
+                st.session_state[f"corrigir_aberto_{item['id']}"] = False
+                st.rerun()
+
+
+def _executar_correcao(sugestao_id: int, escolha, nome_novo: str, categoria_novo: str) -> None:
+    """
+    Se `escolha == "novo"`, cria o produto canônico primeiro e usa o id
+    devolvido; senão usa o id escolhido no selectbox diretamente. Em ambos
+    os casos, chama POST /sugestoes/{id}/corrigir e segue o mesmo padrão de
+    mensagem + rerun de _executar_acao_unitaria.
+    """
+    try:
+        if escolha == "novo":
+            if not nome_novo.strip():
+                _registrar_mensagem("erro", "Informe o nome do novo produto canônico.")
+                st.rerun()
+                return
+            caso_id = st.session_state.get("caso_atual_id")
+            canonico_criado = criar_canonico(caso_id, nome_novo.strip(), categoria_novo.strip() or None)
+            produto_canonico_id = canonico_criado["id"]
+        else:
+            produto_canonico_id = escolha
+
+        resultado = corrigir_sugestao(sugestao_id, produto_canonico_id)
+    except ErroApi as erro:
+        _registrar_mensagem("erro", f"Erro de comunicação com a API: {erro.detalhe}")
+        st.rerun()
+        return
+
+    if resultado["status"] == "erro":
+        _registrar_mensagem(
+            "erro",
+            f"Falha ao corrigir sugestão {sugestao_id}: {resultado.get('motivo', 'motivo desconhecido')}",
+        )
+    else:
+        _registrar_mensagem("sucesso", f"Sugestão {sugestao_id} corrigida com sucesso.")
+        st.session_state[f"corrigir_aberto_{sugestao_id}"] = False
+    st.rerun()
+
+
+def _exibir_canonicos(caso_id: int) -> None:
+    """
+    Lista os produtos canônicos do caso (mesma listar_canonicos usada no
+    filtro de categoria), cada linha com uma ação de editar nome/categoria
+    inline, no mesmo padrão de session_state + rerun do resto da tela.
+    """
+    st.subheader("Produtos canônicos do caso")
+
+    try:
+        canonicos = listar_canonicos(caso_id)
+    except ErroApi as erro:
+        st.error(f"Erro ao carregar produtos canônicos: {erro.detalhe}")
+        return
+
+    if not canonicos:
+        st.info("Nenhum produto canônico cadastrado neste caso ainda.")
+        return
+
+    cabecalho = st.columns([3, 2, 0.8])
+    for coluna, titulo in zip(cabecalho, ["Nome canônico", "Categoria", ""]):
+        coluna.markdown(f"**{titulo}**")
+
+    for canonico in canonicos:
+        linha = st.columns([3, 2, 0.8])
+        linha[0].write(canonico["nome_canonico"])
+        linha[1].write(canonico["categoria"] or "--")
+        chave_editando = f"editando_canonico_{canonico['id']}"
+        if linha[2].button("Editar", key=f"editar_canonico_{canonico['id']}"):
+            st.session_state[chave_editando] = not st.session_state.get(chave_editando, False)
+            st.rerun()
+
+        if st.session_state.get(chave_editando):
+            with st.container(border=True):
+                col_nome, col_categoria = st.columns(2)
+                with col_nome:
+                    novo_nome = st.text_input(
+                        "Nome canônico",
+                        value=canonico["nome_canonico"],
+                        key=f"nome_canonico_edit_{canonico['id']}",
+                    )
+                with col_categoria:
+                    nova_categoria = st.text_input(
+                        "Categoria",
+                        value=canonico["categoria"] or "",
+                        key=f"categoria_canonico_edit_{canonico['id']}",
+                    )
+                if st.button("Salvar", key=f"salvar_canonico_{canonico['id']}"):
+                    _executar_edicao_canonico(canonico["id"], novo_nome, nova_categoria)
+
+
+def _executar_edicao_canonico(produto_canonico_id: int, nome_canonico: str, categoria: str) -> None:
+    """PATCH /api/produtos/canonicos/{id}: diferente das rotas de revisão,
+    essa devolve 4xx (via ErroApi) em erro, não {"status": "erro"} em 200."""
+    try:
+        editar_canonico(produto_canonico_id, nome_canonico=nome_canonico, categoria=categoria)
+    except ErroApi as erro:
+        _registrar_mensagem(
+            "erro", f"Erro ao editar produto canônico {produto_canonico_id}: {erro.detalhe}"
+        )
+        st.rerun()
+        return
+
+    _registrar_mensagem("sucesso", f"Produto canônico {produto_canonico_id} atualizado com sucesso.")
+    st.session_state[f"editando_canonico_{produto_canonico_id}"] = False
+    st.rerun()
 
 
 def _registrar_mensagem(nivel: str, texto: str) -> None:
