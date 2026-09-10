@@ -85,6 +85,27 @@ services:
     depends_on:
       - api
 
+  web:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.web
+    command: npm run dev -- --host 0.0.0.0 --port 5173
+    ports:
+      - "5173:5173"
+    environment:
+      # Inverso do serviço `frontend`: o React roda no browser do HOST, não
+      # dentro do container, então "api" (nome do serviço na rede do
+      # Compose) não resolve para o browser -- precisa ser localhost:8000.
+      # Trocar isso por engano (copiando o padrão do `frontend` acima) dá um
+      # erro de rede difícil de diagnosticar.
+      - VITE_API_BASE_URL=http://localhost:8000
+    volumes:
+      - ./web:/code
+      - web_node_modules:/code/node_modules
+    depends_on:
+      - api
+
 volumes:
   db_data:
   nfe_uploads:
+  web_node_modules:

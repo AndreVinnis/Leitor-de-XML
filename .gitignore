@@ -16,5 +16,10 @@ venv/
 .idea/
 .DS_Store
 
+# Node (web/)
+web/node_modules/
+web/dist/
+web/.env
+
 # Claude Code
 CLAUDE.md
