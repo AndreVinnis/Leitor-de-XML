@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from app.api import (
@@ -12,6 +13,7 @@ from app.api import (
     routes_produtos,
     routes_upload,
 )
+from app.core.config import settings
 from app.core.database import async_engine
 
 
@@ -37,6 +39,19 @@ app = FastAPI(
     title="Sistema de Análise de Notas Fiscais (XML) com IA",
     version="0.1.0",
     lifespan=lifespan,
+)
+
+# O frontend React (web/) roda no browser do host e chama a API por
+# fetch/XHR, então precisa de CORS -- o Streamlit nunca precisou porque
+# chama a API do lado do servidor com `requests`. allow_credentials fica
+# desligado de propósito: a autenticação é Bearer no header
+# (app/core/auth.py, BearerTransport), não cookie.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[origem.strip() for origem in settings.cors_origins.split(",") if origem.strip()],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 app.include_router(routes_auth.router, prefix="/api/auth", tags=["auth"])
