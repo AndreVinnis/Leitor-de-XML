@@ -1,0 +1,25 @@
+@import "./tokens.css";
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--fonte-base);
+  font-size: var(--tamanho-texto-base);
+  color: var(--cor-texto);
+  background: var(--cor-fundo);
+}
+
+button {
+  font-family: inherit;
+}
+
+h1,
+h2,
+h3 {
+  font-family: inherit;
+}

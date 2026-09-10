@@ -1,0 +1,33 @@
+.wrapper {
+  overflow-x: auto;
+}
+
+.tabela {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.tabela th,
+.tabela td {
+  text-align: left;
+  padding: 14px var(--espaco-3);
+  border-bottom: 1px solid var(--cor-borda);
+}
+
+.tabela th {
+  color: var(--cor-texto-secundario);
+  font-weight: 600;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.tabela td {
+  color: var(--cor-texto);
+}
+
+.vazio {
+  color: var(--cor-texto-secundario);
+  padding: var(--espaco-3) 0;
+}

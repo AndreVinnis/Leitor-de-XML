@@ -1,0 +1,5 @@
+.paginacao {
+  display: flex;
+  gap: var(--espaco-2);
+  justify-content: flex-end;
+}

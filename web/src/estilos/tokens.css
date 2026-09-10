@@ -1,0 +1,39 @@
+/*
+ * Paleta e escala extraídas do protótipo Figma (get_variable_defs via MCP),
+ * nós "01 - Login" e "03 - Home (Dashboard)" -- Etapa 3 do plano de migração.
+ */
+:root {
+  --cor-primaria: #6d1b2e;
+  --cor-primaria-hover: #5a1625;
+  --cor-primaria-escura: #4a1120;
+  --cor-texto: #2b1414;
+  --cor-texto-secundario: #7a6f63;
+  --cor-texto-on-primaria: #f5eee0;
+  --cor-fundo: #f5eee0;
+  --cor-superficie: #fffcf6;
+  --cor-borda: #e0d2b4;
+  --cor-accent: #c9a227;
+  --cor-accent-fundo: #f5ebc7;
+  --cor-erro: #a32e2e;
+  --cor-erro-fundo: #f3dede;
+  --cor-sucesso: #4f7942;
+  --cor-sucesso-fundo: #e4ebde;
+
+  --fonte-base: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --tamanho-texto-base: 14px;
+  --tamanho-texto-titulo: 26px;
+  --tamanho-texto-subtitulo: 17px;
+
+  --espaco-1: 4px;
+  --espaco-2: 8px;
+  --espaco-3: 16px;
+  --espaco-4: 24px;
+  --espaco-5: 32px;
+
+  --raio-borda: 8px;
+  --raio-card: 12px;
+  --raio-pill: 100px;
+  --sombra-card: none;
+  --sombra-flutuante: 0px 8px 24px 0px rgba(43, 20, 20, 0.12);
+  --sombra-cartao-login: 0px 8px 24px 0px rgba(107, 27, 46, 0.12);
+}

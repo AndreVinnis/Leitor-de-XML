@@ -1,0 +1,36 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 12px;
+  border-radius: var(--raio-pill);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.sucesso {
+  background: var(--cor-sucesso-fundo);
+  color: var(--cor-sucesso);
+}
+
+.pendente {
+  background: var(--cor-accent-fundo);
+  color: var(--cor-primaria-escura);
+}
+
+.erro {
+  background: var(--cor-erro-fundo);
+  color: var(--cor-erro);
+}
+
+.neutro {
+  background: var(--cor-fundo);
+  border: 1px solid var(--cor-borda);
+  color: var(--cor-texto-secundario);
+}
+
+.info {
+  background: var(--cor-accent-fundo);
+  color: var(--cor-primaria);
+}
