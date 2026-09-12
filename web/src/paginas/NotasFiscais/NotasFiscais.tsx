@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { listarNotas } from "../../api/notas";
 import type { StatusNota, TipoNota } from "../../api/tipos";
@@ -76,6 +76,7 @@ const COLUNAS_NOTAS: ColunaTabela<NotaLinha>[] = [
 export function NotasFiscais() {
   const { casoId } = useParams<{ casoId: string }>();
   const casoIdNumero = Number(casoId);
+  const navigate = useNavigate();
 
   const [tipoFiltro, setTipoFiltro] = useState<TipoNota | "">("");
   const [statusFiltro, setStatusFiltro] = useState<StatusNota | "">("");
@@ -181,6 +182,7 @@ export function NotasFiscais() {
           linhas={notas.data?.itens ?? []}
           chaveLinha={(linha) => linha.id}
           vazio="Nenhuma nota encontrada com esse filtro."
+          onClicarLinha={(linha) => navigate(`/casos/${casoIdNumero}/notas/${linha.id}`)}
         />
 
         {notas.data && <Paginacao offset={offset} limite={LIMITE_NOTAS} total={notas.data.total} onMudar={setOffset} />}

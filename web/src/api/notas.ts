@@ -1,5 +1,5 @@
 import { get, post } from "./cliente";
-import type { ListaNotas, ProgressoLote, StatusNota, TipoNota, UploadNotasResposta } from "./tipos";
+import type { ListaNotas, NotaDetalhe, ProgressoLote, StatusNota, TipoNota, UploadNotasResposta } from "./tipos";
 
 interface ParametrosListarNotas {
   clienteCasoId: number;
@@ -22,6 +22,10 @@ export function listarNotas(params: ParametrosListarNotas): Promise<ListaNotas> 
   query.set("limit", String(params.limit ?? 20));
   query.set("offset", String(params.offset ?? 0));
   return get<ListaNotas>(`/api/notas?${query.toString()}`);
+}
+
+export function obterNota(notaId: number): Promise<NotaDetalhe> {
+  return get<NotaDetalhe>(`/api/notas/${notaId}`);
 }
 
 export function progressoLote(loteId: string): Promise<ProgressoLote> {

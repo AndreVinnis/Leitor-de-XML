@@ -119,12 +119,16 @@ async def progresso_lote(lote_id: str, usuario: Usuario = Depends(usuario_atual_
 
 @router.get("/{nota_id}")
 async def obter_nota(nota_id: int, usuario: Usuario = Depends(usuario_atual_ativo)):
-    """Cabeçalho da nota + seus itens."""
+    """Cabeçalho da nota (+ status e arquivo de origem, via ArquivoLote) e seus itens."""
     db: Session = SessionLocal()
     try:
         nota = db.get(Nota, nota_id)
         if nota is None:
             raise HTTPException(status_code=404, detail="Nota não encontrada.")
+
+        arquivo_lote = (
+            db.query(ArquivoLote).filter(ArquivoLote.nota_id == nota.id).one_or_none()
+        )
 
         return {
             "id": nota.id,
@@ -137,8 +141,11 @@ async def obter_nota(nota_id: int, usuario: Usuario = Depends(usuario_atual_ativ
             "emitente_nome": nota.emitente_nome,
             "destinatario_cnpj": nota.destinatario_cnpj,
             "destinatario_nome": nota.destinatario_nome,
-            "valor_total": float(nota.valor_total) if nota.valor_total is not None else None,
+            # Dinheiro: string decimal, nunca float -- mesma regra de listar_notas.
+            "valor_total": str(nota.valor_total) if nota.valor_total is not None else None,
             "cliente_caso_id": nota.cliente_caso_id,
+            "status": arquivo_lote.status.value if arquivo_lote is not None and arquivo_lote.status is not None else None,
+            "arquivo_origem": arquivo_lote.nome_arquivo if arquivo_lote is not None else None,
             "itens": [
                 {
                     "id": item.id,
@@ -148,12 +155,13 @@ async def obter_nota(nota_id: int, usuario: Usuario = Depends(usuario_atual_ativ
                     "ncm": item.ncm,
                     "cfop": item.cfop,
                     "unidade": item.unidade,
-                    "quantidade": float(item.quantidade) if item.quantidade is not None else None,
-                    "valor_unitario": (
-                        float(item.valor_unitario) if item.valor_unitario is not None else None
-                    ),
-                    "valor_total": float(item.valor_total) if item.valor_total is not None else None,
+                    "quantidade": str(item.quantidade) if item.quantidade is not None else None,
+                    "valor_unitario": str(item.valor_unitario) if item.valor_unitario is not None else None,
+                    "valor_total": str(item.valor_total) if item.valor_total is not None else None,
                     "produto_canonico_id": item.produto_canonico_id,
+                    "produto_canonico_nome": (
+                        item.produto_canonico.nome_canonico if item.produto_canonico is not None else None
+                    ),
                 }
                 for item in nota.itens
             ],
