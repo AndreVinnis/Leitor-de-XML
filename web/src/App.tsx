@@ -6,7 +6,11 @@ import { ProvedorCasos, useCasos } from "./casos/ContextoCaso";
 import { ProvedorToast } from "./componentes/Toast";
 import { LayoutApp } from "./layout/LayoutApp";
 import { Login } from "./paginas/Login/Login";
+import { CriarConta } from "./paginas/CriarConta/CriarConta";
 import { Dashboard } from "./paginas/Dashboard/Dashboard";
+import { UploadXml } from "./paginas/UploadXml/UploadXml";
+import { NotasFiscais } from "./paginas/NotasFiscais/NotasFiscais";
+import { NotaFiscal } from "./paginas/NotaFiscal/NotaFiscal";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -48,11 +52,15 @@ export function App() {
           <BrowserRouter>
             <Routes>
               <Route path="/login" element={<Login />} />
+              <Route path="/criar-conta" element={<CriarConta />} />
               <Route element={<RotaProtegida />}>
                 <Route element={<ProvedorCasosLayout />}>
                   <Route element={<LayoutApp />}>
                     <Route index element={<RedirecionamentoInicial />} />
                     <Route path="casos/:casoId/dashboard" element={<Dashboard />} />
+                    <Route path="casos/:casoId/upload" element={<UploadXml />} />
+                    <Route path="casos/:casoId/notas" element={<NotasFiscais />} />
+                    <Route path="casos/:casoId/notas/:notaId" element={<NotaFiscal />} />
                   </Route>
                 </Route>
               </Route>

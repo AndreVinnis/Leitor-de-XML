@@ -27,6 +27,14 @@
   color: var(--cor-texto);
 }
 
+.linhaClicavel {
+  cursor: pointer;
+}
+
+.linhaClicavel:hover {
+  background: var(--cor-fundo);
+}
+
 .vazio {
   color: var(--cor-texto-secundario);
   padding: var(--espaco-3) 0;

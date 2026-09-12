@@ -34,10 +34,14 @@ export interface EstatisticasDashboard {
 
 export type StatusNota = "pendente" | "sucesso" | "erro" | "duplicado";
 
+export type TipoNota = "entrada" | "saida";
+
 export interface NotaResumo {
   id: number;
   numero: string | null;
+  tipo: TipoNota | null;
   emitente_nome: string | null;
+  destinatario_nome: string | null;
   data_emissao: string | null;
   // Decimal serializado como string pela API -- nunca number. Formatar na
   // exibição, nunca fazer conta com esse campo direto no front.
@@ -48,6 +52,40 @@ export interface NotaResumo {
 export interface ListaNotas {
   itens: NotaResumo[];
   total: number;
+}
+
+export interface ItemNotaDetalhe {
+  id: number;
+  numero_item: number | null;
+  codigo_produto: string | null;
+  descricao_original: string;
+  ncm: string | null;
+  cfop: string | null;
+  unidade: string | null;
+  // Decimal/quantidade serializados como string pela API -- ver NotaResumo.valor_total.
+  quantidade: string | null;
+  valor_unitario: string | null;
+  valor_total: string | null;
+  produto_canonico_id: number | null;
+  produto_canonico_nome: string | null;
+}
+
+export interface NotaDetalhe {
+  id: number;
+  chave_acesso: string;
+  tipo: TipoNota;
+  numero: string | null;
+  serie: string | null;
+  data_emissao: string | null;
+  emitente_cnpj: string | null;
+  emitente_nome: string | null;
+  destinatario_cnpj: string | null;
+  destinatario_nome: string | null;
+  valor_total: string | null;
+  cliente_caso_id: number;
+  status: StatusNota | null;
+  arquivo_origem: string | null;
+  itens: ItemNotaDetalhe[];
 }
 
 export interface UploadNotasResposta {
