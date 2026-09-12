@@ -1,9 +1,12 @@
+from datetime import date, timedelta
+
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.core.auth import usuario_atual_ativo
 from app.core.database import SessionLocal
-from app.models.models import ArquivoLote, Lote, Nota, StatusProcessamento, Usuario
+from app.models.models import ArquivoLote, Lote, Nota, StatusProcessamento, TipoNota, Usuario
 
 router = APIRouter()
 
@@ -12,14 +15,19 @@ router = APIRouter()
 async def listar_notas(
     cliente_caso_id: int | None = None,
     status: str | None = None,
+    tipo: str | None = None,
+    q: str | None = None,
+    data_inicio: date | None = None,
+    data_fim: date | None = None,
     limit: int = 50,
     offset: int = 0,
     usuario: Usuario = Depends(usuario_atual_ativo),
 ):
     """
-    Alimenta a tabela "Notas recentes" do dashboard: numero, emitente_nome,
-    data_emissao, valor_total e o status de processamento (que vive em
-    ArquivoLote, não em Nota -- ver app/models/models.py).
+    Alimenta o dashboard ("Notas recentes") e a tela Notas Fiscais: numero,
+    tipo, emitente_nome, destinatario_nome, data_emissao, valor_total e o
+    status de processamento (que vive em ArquivoLote, não em Nota -- ver
+    app/models/models.py).
     """
     db: Session = SessionLocal()
     try:
@@ -30,6 +38,25 @@ async def listar_notas(
             query = query.filter(Nota.cliente_caso_id == cliente_caso_id)
         if status is not None:
             query = query.filter(ArquivoLote.status == StatusProcessamento(status))
+        if tipo is not None:
+            query = query.filter(Nota.tipo == TipoNota(tipo))
+        if q is not None:
+            termo = f"%{q}%"
+            query = query.filter(
+                or_(
+                    Nota.numero.ilike(termo),
+                    Nota.chave_acesso.ilike(termo),
+                    Nota.emitente_nome.ilike(termo),
+                )
+            )
+        if data_inicio is not None:
+            query = query.filter(Nota.data_emissao >= data_inicio)
+        if data_fim is not None:
+            # data_emissao é DateTime e costuma ter hora (não só a meia-noite
+            # do dia); comparar com "<=" contra a date pura excluiria o
+            # próprio dia final. Soma 1 dia e usa "<" para incluir o dia
+            # inteiro.
+            query = query.filter(Nota.data_emissao < data_fim + timedelta(days=1))
 
         total = query.count()
         resultados = query.order_by(Nota.criado_em.desc()).offset(offset).limit(limit).all()
@@ -38,7 +65,9 @@ async def listar_notas(
             {
                 "id": nota.id,
                 "numero": nota.numero,
+                "tipo": nota.tipo.value if nota.tipo is not None else None,
                 "emitente_nome": nota.emitente_nome,
+                "destinatario_nome": nota.destinatario_nome,
                 "data_emissao": nota.data_emissao,
                 # Decimal serializado como string, não float: é dinheiro e o
                 # frontend não deve receber ponto flutuante nesse campo.

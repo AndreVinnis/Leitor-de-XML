@@ -34,10 +34,14 @@ export interface EstatisticasDashboard {
 
 export type StatusNota = "pendente" | "sucesso" | "erro" | "duplicado";
 
+export type TipoNota = "entrada" | "saida";
+
 export interface NotaResumo {
   id: number;
   numero: string | null;
+  tipo: TipoNota | null;
   emitente_nome: string | null;
+  destinatario_nome: string | null;
   data_emissao: string | null;
   // Decimal serializado como string pela API -- nunca number. Formatar na
   // exibição, nunca fazer conta com esse campo direto no front.

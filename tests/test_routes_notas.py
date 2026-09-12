@@ -39,15 +39,26 @@ def _criar_caso(session, nome="Cliente A"):
     return caso
 
 
-def _criar_nota(session, caso_id, chave, numero, emitente_nome="Fornecedor X", valor_total=100):
+def _criar_nota(
+    session,
+    caso_id,
+    chave,
+    numero,
+    emitente_nome="Fornecedor X",
+    valor_total=100,
+    tipo=TipoNota.ENTRADA,
+    destinatario_nome=None,
+    data_emissao=datetime(2024, 5, 10),
+):
     nota = Nota(
         chave_acesso=chave,
-        tipo=TipoNota.ENTRADA,
+        tipo=tipo,
         numero=numero,
         emitente_nome=emitente_nome,
+        destinatario_nome=destinatario_nome,
         valor_total=valor_total,
         cliente_caso_id=caso_id,
-        data_emissao=datetime(2024, 5, 10),
+        data_emissao=data_emissao,
     )
     session.add(nota)
     session.commit()
@@ -114,6 +125,94 @@ def test_listar_notas_filtra_por_status(client, db_session_factory, logar_usuari
     assert corpo["total"] == 1
     assert corpo["itens"][0]["id"] == nota_ok.id
     assert corpo["itens"][0]["status"] == "sucesso"
+
+
+def test_listar_notas_retorna_tipo_e_destinatario(client, db_session_factory, logar_usuario):
+    session = db_session_factory()
+    usuario = _criar_usuario(session)
+    caso = _criar_caso(session)
+    _criar_nota(
+        session,
+        caso.id,
+        chave="4" * 44,
+        numero="4",
+        tipo=TipoNota.SAIDA,
+        destinatario_nome="Cliente Final Ltda",
+    )
+    session.close()
+    logar_usuario(usuario)
+
+    resp = client.get(f"/api/notas?cliente_caso_id={caso.id}")
+    assert resp.status_code == 200
+    item = resp.json()["itens"][0]
+    assert item["tipo"] == "saida"
+    assert item["destinatario_nome"] == "Cliente Final Ltda"
+
+
+def test_listar_notas_filtra_por_tipo(client, db_session_factory, logar_usuario):
+    session = db_session_factory()
+    usuario = _criar_usuario(session)
+    caso = _criar_caso(session)
+    _criar_nota(session, caso.id, chave="5" * 44, numero="5", tipo=TipoNota.ENTRADA)
+    _criar_nota(session, caso.id, chave="6" * 44, numero="6", tipo=TipoNota.SAIDA)
+    session.close()
+    logar_usuario(usuario)
+
+    resp = client.get(f"/api/notas?cliente_caso_id={caso.id}&tipo=saida")
+    assert resp.status_code == 200
+    corpo = resp.json()
+    assert corpo["total"] == 1
+    assert corpo["itens"][0]["numero"] == "6"
+
+
+def test_listar_notas_busca_textual_por_numero_chave_ou_emitente(client, db_session_factory, logar_usuario):
+    session = db_session_factory()
+    usuario = _criar_usuario(session)
+    caso = _criar_caso(session)
+    _criar_nota(session, caso.id, chave="7" * 44, numero="7000", emitente_nome="Distribuidora Ouro Fino")
+    _criar_nota(session, caso.id, chave="8" * 44, numero="8000", emitente_nome="Comércio Beira Rio")
+    session.close()
+    logar_usuario(usuario)
+
+    resp = client.get(f"/api/notas?cliente_caso_id={caso.id}&q=ouro")
+    assert resp.status_code == 200
+    corpo = resp.json()
+    assert corpo["total"] == 1
+    assert corpo["itens"][0]["numero"] == "7000"
+
+
+def test_listar_notas_filtra_por_periodo(client, db_session_factory, logar_usuario):
+    session = db_session_factory()
+    usuario = _criar_usuario(session)
+    caso = _criar_caso(session)
+    _criar_nota(session, caso.id, chave="1" * 43 + "1", numero="10", data_emissao=datetime(2024, 1, 5))
+    _criar_nota(session, caso.id, chave="1" * 43 + "2", numero="11", data_emissao=datetime(2024, 6, 15))
+    session.close()
+    logar_usuario(usuario)
+
+    resp = client.get(f"/api/notas?cliente_caso_id={caso.id}&data_inicio=2024-05-01&data_fim=2024-07-01")
+    assert resp.status_code == 200
+    corpo = resp.json()
+    assert corpo["total"] == 1
+    assert corpo["itens"][0]["numero"] == "11"
+
+
+def test_listar_notas_periodo_inclui_dia_final_com_hora(client, db_session_factory, logar_usuario):
+    # Regressão: data_emissao tem hora (não é meia-noite) na maioria das
+    # notas reais -- "data_fim" precisa incluir o dia inteiro, não só
+    # 00:00:00 daquele dia.
+    session = db_session_factory()
+    usuario = _criar_usuario(session)
+    caso = _criar_caso(session)
+    _criar_nota(session, caso.id, chave="1" * 43 + "3", numero="12", data_emissao=datetime(2024, 8, 1, 23, 30))
+    session.close()
+    logar_usuario(usuario)
+
+    resp = client.get(f"/api/notas?cliente_caso_id={caso.id}&data_inicio=2024-08-01&data_fim=2024-08-01")
+    assert resp.status_code == 200
+    corpo = resp.json()
+    assert corpo["total"] == 1
+    assert corpo["itens"][0]["numero"] == "12"
 
 
 def test_obter_nota_com_itens(client, db_session_factory, logar_usuario):

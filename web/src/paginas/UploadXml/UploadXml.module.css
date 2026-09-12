@@ -1,0 +1,181 @@
+.pagina {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-4);
+}
+
+.cabecalho {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.titulo {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--cor-texto);
+  margin: 0;
+}
+
+.subtitulo {
+  font-size: 14px;
+  color: var(--cor-texto-secundario);
+  margin: 0;
+}
+
+.campoCnpj {
+  max-width: 360px;
+}
+
+.dropArea {
+  border: 1.5px dashed var(--cor-accent);
+  border-radius: var(--raio-card);
+  background: var(--cor-accent-fundo);
+  padding: 40px var(--espaco-4);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--espaco-3);
+  text-align: center;
+  cursor: pointer;
+}
+
+.dropAreaArrastando {
+  border-color: var(--cor-primaria);
+  background: var(--cor-superficie);
+}
+
+.inputArquivos {
+  display: none;
+}
+
+.dropAreaIcone {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--cor-superficie);
+}
+
+.dropAreaTitulo {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--cor-primaria-escura);
+}
+
+.dropAreaSubtitulo {
+  font-size: 13px;
+  color: var(--cor-texto-secundario);
+}
+
+.tituloSecao {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--cor-texto);
+  margin: 0;
+}
+
+.tabelaArquivos {
+  display: flex;
+  flex-direction: column;
+}
+
+.linhaArquivo {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-3);
+  padding: var(--espaco-3) 0;
+  border-bottom: 1px solid var(--cor-borda);
+}
+
+.linhaArquivo:last-child {
+  border-bottom: none;
+}
+
+.nomeArquivo {
+  flex: 1 0 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--cor-texto);
+}
+
+.tamanhoArquivo {
+  flex: 0 0 auto;
+  font-size: 13px;
+  color: var(--cor-texto-secundario);
+}
+
+.botaoRemover {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  background: var(--cor-erro-fundo);
+  color: var(--cor-erro);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rodapeArquivos {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: var(--espaco-3);
+}
+
+.contagemArquivos {
+  font-size: 13px;
+  color: var(--cor-texto-secundario);
+}
+
+.listaProgresso {
+  margin: var(--espaco-3) 0 0 0;
+  padding-left: var(--espaco-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-1);
+}
+
+.progressoResumo {
+  margin: 0;
+  color: var(--cor-texto-secundario);
+  font-size: 13px;
+}
+
+.estadoVazio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--espaco-2);
+  padding: 40px;
+  text-align: center;
+}
+
+.estadoVazioIcone {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--cor-accent-fundo);
+}
+
+.estadoVazioTitulo {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--cor-texto);
+  margin: 0;
+}
+
+.estadoVazioTexto {
+  font-size: 13px;
+  color: var(--cor-texto-secundario);
+  margin: 0;
+}
