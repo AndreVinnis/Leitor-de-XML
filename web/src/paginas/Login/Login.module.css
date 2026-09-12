@@ -1,0 +1,140 @@
+.pagina {
+  min-height: 100vh;
+  display: flex;
+}
+
+.painelMarca {
+  flex: 0 0 clamp(320px, 32vw, 560px);
+  background: var(--cor-primaria);
+  color: var(--cor-texto-on-primaria);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: var(--espaco-4);
+  padding: var(--espaco-5) clamp(24px, 6vw, 72px);
+}
+
+@media (max-width: 720px) {
+  .painelMarca {
+    display: none;
+  }
+}
+
+.logoCirculo {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--cor-accent);
+}
+
+.tituloMarca {
+  font-size: 30px;
+  font-weight: 800;
+  margin: 0;
+  max-width: 400px;
+}
+
+.descricaoMarca {
+  font-size: 16px;
+  opacity: 0.85;
+  margin: 0;
+  max-width: 380px;
+}
+
+.linhaDestaque {
+  width: 64px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--cor-accent);
+}
+
+.painelFormulario {
+  flex: 1 0 0;
+  background: var(--cor-fundo);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--espaco-4);
+}
+
+.cartao {
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-4);
+  padding: 40px;
+  border-radius: 16px;
+  box-shadow: var(--sombra-cartao-login);
+}
+
+.titulo {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--cor-texto);
+  margin: 0;
+}
+
+.subtitulo {
+  font-size: 15px;
+  color: var(--cor-texto-secundario);
+  margin: -12px 0 0 0;
+}
+
+.formulario {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-4);
+}
+
+.linhaRecuperacao {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: -4px;
+}
+
+.linkRecuperacao {
+  background: none;
+  border: none;
+  color: var(--cor-primaria);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.mensagemErro {
+  color: var(--cor-erro);
+  font-size: 13px;
+  margin: 0;
+}
+
+.mensagemSucesso {
+  color: var(--cor-sucesso);
+  font-size: 13px;
+  margin: 0;
+}
+
+.linhaCriarConta {
+  text-align: center;
+  font-size: 14px;
+  color: var(--cor-texto-secundario);
+  margin: 0;
+}
+
+.linkCriarConta {
+  color: var(--cor-primaria);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.linkCriarConta:hover {
+  text-decoration: underline;
+}
+
+.formRecuperacao {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+}

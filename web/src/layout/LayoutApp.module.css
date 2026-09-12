@@ -1,0 +1,253 @@
+.layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.topbar {
+  height: 72px;
+  flex: 0 0 auto;
+  background: var(--cor-superficie);
+  border-bottom: 1px solid var(--cor-borda);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--espaco-5);
+  gap: var(--espaco-3);
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  flex-shrink: 0;
+}
+
+.logoCirculo {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--cor-primaria);
+}
+
+.logoTexto {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--cor-texto);
+  white-space: nowrap;
+}
+
+.grupoDireita {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-4);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.pilulaCaso {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  padding: 9px 14px;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-borda);
+  background: var(--cor-superficie);
+  cursor: pointer;
+  max-width: 320px;
+}
+
+.pilulaCaso:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.pilulaTextos {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.pilulaRotulo {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--cor-texto-secundario);
+}
+
+.pilulaValor {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--cor-texto);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 260px;
+}
+
+.pilulaSeta {
+  color: var(--cor-texto-secundario);
+  font-weight: 700;
+}
+
+.dropdownCaso {
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-borda);
+  box-shadow: var(--sombra-flutuante);
+  overflow: hidden;
+  z-index: 50;
+  min-width: 260px;
+}
+
+.itemCaso {
+  padding: var(--espaco-2) var(--espaco-3);
+  font-size: 13px;
+  color: var(--cor-texto);
+  cursor: pointer;
+  outline: none;
+}
+
+.itemCaso[data-highlighted] {
+  background: var(--cor-fundo);
+}
+
+.acaoNovoCaso {
+  position: relative;
+}
+
+.botaoNovoCaso {
+  background: none;
+  border: none;
+  color: var(--cor-primaria);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  white-space: nowrap;
+}
+
+.formNovoCaso {
+  position: absolute;
+  top: calc(100% + var(--espaco-2));
+  right: 0;
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-borda);
+  box-shadow: var(--sombra-flutuante);
+  padding: var(--espaco-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+  width: 260px;
+  z-index: 60;
+}
+
+.acoesFormNovoCaso {
+  display: flex;
+  gap: var(--espaco-2);
+}
+
+.acoesFormNovoCaso :global(button) {
+  flex: 1;
+  padding: var(--espaco-2) var(--espaco-3);
+  font-size: 13px;
+}
+
+.blocoUsuario {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  flex-shrink: 0;
+}
+
+.nomeUsuario {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--cor-texto);
+  white-space: nowrap;
+}
+
+.avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--cor-primaria);
+  color: var(--cor-texto-on-primaria);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.corpo {
+  flex: 1 0 0;
+  display: flex;
+  min-height: 0;
+}
+
+.sidebar {
+  flex: 0 0 240px;
+  background: var(--cor-fundo);
+  border-right: 1px solid var(--cor-borda);
+  padding: var(--espaco-4) var(--espaco-3) var(--espaco-3);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-3);
+  height: 39px;
+  padding-left: 14px;
+  border-radius: var(--raio-borda);
+  border: none;
+  background: none;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--cor-texto-secundario);
+  cursor: default;
+  text-align: left;
+  width: 100%;
+}
+
+.navBolha {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+.navItemAtivo {
+  background: var(--cor-accent-fundo);
+  color: var(--cor-primaria);
+  cursor: pointer;
+}
+
+.navSair {
+  margin-top: auto;
+  cursor: pointer;
+}
+
+.navSair:hover {
+  background: var(--cor-superficie);
+}
+
+.conteudo {
+  flex: 1 0 0;
+  background: var(--cor-fundo);
+  padding: var(--espaco-5) 40px;
+  overflow-y: auto;
+}

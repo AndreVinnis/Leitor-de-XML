@@ -40,7 +40,9 @@ async def listar_notas(
                 "numero": nota.numero,
                 "emitente_nome": nota.emitente_nome,
                 "data_emissao": nota.data_emissao,
-                "valor_total": float(nota.valor_total) if nota.valor_total is not None else None,
+                # Decimal serializado como string, não float: é dinheiro e o
+                # frontend não deve receber ponto flutuante nesse campo.
+                "valor_total": str(nota.valor_total) if nota.valor_total is not None else None,
                 "status": status_arquivo.value if status_arquivo is not None else None,
             }
             for nota, status_arquivo in resultados

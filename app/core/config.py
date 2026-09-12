@@ -13,6 +13,11 @@ class Settings(BaseSettings):
     api_base_url: str = "http://localhost:8000"
     token_aprovacao_expira_minutos: int = 30
 
+    # Origens autorizadas a chamar a API pelo browser (CORS). Lista separada
+    # por vírgula -- o Streamlit não precisa disso (chama a API do lado do
+    # servidor), mas o frontend React em web/ roda no browser do host.
+    cors_origins: str = "http://localhost:5173"
+
     smtp_host: str = "localhost"
     smtp_port: int = 1025
     smtp_user: str = ""

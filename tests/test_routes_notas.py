@@ -72,6 +72,9 @@ def test_listar_notas_com_paginacao_e_filtro_por_caso(client, db_session_factory
     corpo = resp.json()
     assert corpo["total"] == 3
     assert len(corpo["itens"]) == 2
+    # valor_total é dinheiro: serializado como string decimal, nunca float.
+    assert corpo["itens"][0]["valor_total"] == "100.00"
+    assert isinstance(corpo["itens"][0]["valor_total"], str)
 
     resp_pagina_2 = client.get(f"/api/notas?cliente_caso_id={caso_a.id}&limit=2&offset=2")
     assert len(resp_pagina_2.json()["itens"]) == 1

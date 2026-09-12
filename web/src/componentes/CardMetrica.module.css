@@ -1,0 +1,30 @@
+.cardMetrica {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+  flex: 1 0 0;
+  min-width: 160px;
+}
+
+.rotulo {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--cor-texto-secundario);
+}
+
+.valor {
+  font-size: 32px;
+  font-weight: 800;
+}
+
+.primaria {
+  color: var(--cor-primaria);
+}
+
+.accent {
+  color: var(--cor-accent);
+}
+
+.erro {
+  color: var(--cor-erro);
+}

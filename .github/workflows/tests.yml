@@ -31,3 +31,28 @@ jobs:
 
       - name: Rodar testes
         run: pytest -v
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: web/package-lock.json
+
+      - name: Instalar dependências
+        working-directory: web
+        run: npm ci
+
+      - name: Checar tipos
+        working-directory: web
+        run: npx tsc --noEmit
+
+      - name: Build de produção
+        working-directory: web
+        run: npm run build

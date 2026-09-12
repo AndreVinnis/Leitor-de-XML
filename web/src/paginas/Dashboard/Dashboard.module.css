@@ -1,0 +1,101 @@
+.pagina {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-4);
+}
+
+.cabecalho {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--espaco-3);
+}
+
+.titulo {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--cor-texto);
+  margin: 0 0 4px 0;
+}
+
+.subtitulo {
+  font-size: 14px;
+  color: var(--cor-texto-secundario);
+  margin: 0;
+}
+
+.cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.tituloSecao {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--cor-texto);
+  margin: 0 0 var(--espaco-3) 0;
+}
+
+.formUpload {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-3);
+}
+
+.dropArea {
+  border: 1.5px dashed var(--cor-accent);
+  border-radius: var(--raio-card);
+  background: var(--cor-accent-fundo);
+  padding: 40px var(--espaco-4);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--espaco-3);
+  text-align: center;
+  cursor: pointer;
+}
+
+.inputArquivos {
+  display: none;
+}
+
+.dropAreaIcone {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--cor-superficie);
+}
+
+.dropAreaTitulo {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--cor-primaria-escura);
+}
+
+.dropAreaSubtitulo {
+  font-size: 13px;
+  color: var(--cor-texto-secundario);
+}
+
+.listaArquivos {
+  margin: 0;
+  padding-left: var(--espaco-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-1);
+}
+
+.cabecalhoNotas {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--espaco-2);
+}
+
+.contagem {
+  color: var(--cor-texto-secundario);
+  font-size: 13px;
+  margin: 0 0 var(--espaco-2) 0;
+}
