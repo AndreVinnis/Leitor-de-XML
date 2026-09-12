@@ -6,6 +6,7 @@ import { ProvedorCasos, useCasos } from "./casos/ContextoCaso";
 import { ProvedorToast } from "./componentes/Toast";
 import { LayoutApp } from "./layout/LayoutApp";
 import { Login } from "./paginas/Login/Login";
+import { CriarConta } from "./paginas/CriarConta/CriarConta";
 import { Dashboard } from "./paginas/Dashboard/Dashboard";
 
 const queryClient = new QueryClient({
@@ -48,6 +49,7 @@ export function App() {
           <BrowserRouter>
             <Routes>
               <Route path="/login" element={<Login />} />
+              <Route path="/criar-conta" element={<CriarConta />} />
               <Route element={<RotaProtegida />}>
                 <Route element={<ProvedorCasosLayout />}>
                   <Route element={<LayoutApp />}>
