@@ -1,4 +1,4 @@
-import { get, post, postJson } from "./cliente";
+import { get, patch, post, postJson } from "./cliente";
 import type { LoginResposta, UsuarioLogado } from "./tipos";
 
 export function login(email: string, senha: string): Promise<LoginResposta> {
@@ -31,5 +31,30 @@ export function solicitarRedefinicaoSenha(email: string): Promise<void> {
     semAuth: true,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email }),
+  });
+}
+
+/**
+ * PATCH /api/auth/users/me (fastapi-users) já existe e já aceita nome/email
+ * do próprio usuário -- UsuarioUpdate (app/schemas/usuario.py) não expõe
+ * role/status_cadastro, então não há risco de autopromoção por aqui.
+ */
+export function atualizarPerfil(campos: { nome?: string; email?: string }): Promise<UsuarioLogado> {
+  return patch<UsuarioLogado>("/api/auth/users/me", {
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(campos),
+  });
+}
+
+/**
+ * Mesma rota de atualizarPerfil, mudando só a senha. O fastapi-users não
+ * exige a senha atual para isso -- quem chama (tela de Configurações) deve
+ * validar a senha atual antes, chamando `login()` com ela e descartando o
+ * token, para não precisar de um endpoint novo só para essa checagem.
+ */
+export function alterarSenha(novaSenha: string): Promise<UsuarioLogado> {
+  return patch<UsuarioLogado>("/api/auth/users/me", {
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password: novaSenha }),
   });
 }

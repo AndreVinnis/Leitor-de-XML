@@ -11,12 +11,6 @@ import { Modal } from "../componentes/Modal";
 import { ErroApi } from "../api/cliente";
 import estilos from "./LayoutApp.module.css";
 
-// Itens de navegação previstos no protótipo (telas 07 e 08) que ainda não
-// têm rota no React -- ficam visíveis para bater com o Figma, mas inertes
-// até a fase correspondente da migração ser feita, em vez de linkar para
-// uma página que não existe.
-const ITENS_EM_CONSTRUCAO = ["Aprovação de Cadastros", "Configurações"];
-
 function iniciais(nome: string): string {
   const partes = nome.trim().split(/\s+/);
   const primeira = partes[0]?.[0] ?? "";
@@ -225,12 +219,24 @@ export function LayoutApp() {
               <span className={estilos.navBolha} />
               Consulta
             </button>
-            {ITENS_EM_CONSTRUCAO.map((rotulo) => (
-              <span key={rotulo} className={estilos.navItem} title="Em construção nesta fase da migração">
+            <button
+              type="button"
+              className={`${estilos.navItem} ${estaAtivo("/configuracoes") ? estilos.navItemAtivo : ""}`}
+              onClick={() => casoId && navigate(`/casos/${casoId}/configuracoes`)}
+            >
+              <span className={estilos.navBolha} />
+              Configurações
+            </button>
+            {usuario?.role === "administrador" && (
+              <button
+                type="button"
+                className={`${estilos.navItem} ${estaAtivo("/aprovacao-de-cadastros") ? estilos.navItemAtivo : ""}`}
+                onClick={() => casoId && navigate(`/casos/${casoId}/aprovacao-de-cadastros`)}
+              >
                 <span className={estilos.navBolha} />
-                {rotulo}
-              </span>
-            ))}
+                Aprovação de Cadastros
+              </button>
+            )}
           </nav>
 
           <button type="button" className={`${estilos.navItem} ${estilos.navSair}`} onClick={sair}>

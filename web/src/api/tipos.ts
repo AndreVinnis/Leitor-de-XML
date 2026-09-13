@@ -3,12 +3,16 @@
 // tem schema de resposta para gerar isso automaticamente. Ver a seção 1.3
 // do plano de migração (fora de escopo desta fase, tratar como dívida).
 
+export type RoleUsuario = "comum" | "administrador";
+
+export type StatusCadastro = "pendente" | "aprovado" | "reprovado";
+
 export interface UsuarioLogado {
   id: number;
   email: string;
   nome: string;
-  role: "comum" | "administrador";
-  status_cadastro: "pendente" | "aprovado" | "reprovado";
+  role: RoleUsuario;
+  status_cadastro: StatusCadastro;
   is_active: boolean;
   is_superuser: boolean;
   is_verified: boolean;
@@ -187,4 +191,33 @@ export interface ResultadoConsulta {
   colunas: string[];
   linhas: unknown[][];
   total_linhas: number;
+}
+
+// -- Usuários / Aprovação de Cadastros (app/api/routes_usuarios.py) -------
+
+export interface UsuarioAdmin {
+  id: number;
+  nome: string;
+  email: string;
+  role: RoleUsuario;
+  status_cadastro: StatusCadastro;
+  is_active: boolean;
+  criado_em: string;
+}
+
+export interface ListaUsuarios {
+  itens: UsuarioAdmin[];
+  total: number;
+}
+
+// Aprovar/reprovar (unitário e em lote) devolvem sempre HTTP 200 -- ver
+// comentário de app/api/routes_usuarios.py::_decidir_cadastro.
+export interface ResultadoDecisaoCadastro {
+  status: "ok" | "erro";
+  usuario_id?: number;
+  motivo?: string;
+}
+
+export interface ResultadoDecisaoCadastroLote {
+  resultados: ResultadoDecisaoCadastro[];
 }

@@ -8,6 +8,8 @@ interface ContextoAuthValor {
   carregando: boolean;
   entrar: (email: string, senha: string) => Promise<void>;
   sair: () => void;
+  /** Atualiza o usuário armazenado (sessionStorage + contexto) após uma edição de perfil bem-sucedida. */
+  atualizarUsuario: (usuario: UsuarioLogado) => void;
 }
 
 const ContextoAuth = createContext<ContextoAuthValor | null>(null);
@@ -52,7 +54,16 @@ export function ProvedorAuth({ children }: { children: ReactNode }) {
     setUsuario(null);
   }
 
-  return <ContextoAuth.Provider value={{ usuario, carregando, entrar, sair }}>{children}</ContextoAuth.Provider>;
+  function atualizarUsuario(usuarioAtualizado: UsuarioLogado) {
+    sessionStorage.setItem("usuario", JSON.stringify(usuarioAtualizado));
+    setUsuario(usuarioAtualizado);
+  }
+
+  return (
+    <ContextoAuth.Provider value={{ usuario, carregando, entrar, sair, atualizarUsuario }}>
+      {children}
+    </ContextoAuth.Provider>
+  );
 }
 
 export function useAuth(): ContextoAuthValor {

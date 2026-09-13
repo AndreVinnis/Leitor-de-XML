@@ -12,6 +12,7 @@ from app.api import (
     routes_notas,
     routes_produtos,
     routes_upload,
+    routes_usuarios,
 )
 from app.core.config import settings
 from app.core.database import async_engine
@@ -61,6 +62,7 @@ app.include_router(routes_produtos.router, prefix="/api/produtos", tags=["produt
 app.include_router(routes_casos.router, prefix="/api/casos", tags=["casos"])
 app.include_router(routes_dashboard.router, prefix="/api/dashboard", tags=["dashboard"])
 app.include_router(routes_consulta.router, prefix="/api/consulta", tags=["consulta"])
+app.include_router(routes_usuarios.router, prefix="/api/usuarios", tags=["usuarios"])
 
 
 @app.get("/health")

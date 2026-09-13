@@ -7,9 +7,8 @@ Vite + React + TypeScript, CSS Modules (sem Tailwind), primitivos do Radix
 UI para os componentes que exigem acessibilidade (`Select`, `Toast`).
 
 Fase atual: Login, Criar Conta, Dashboard, Upload de XML, Notas Fiscais,
-Produtos (Sugestões da IA + Produtos Canônicos + Itens Vinculados) e Consulta.
-Faltam Aprovação de Cadastros e Configurações (ainda placeholders na
-sidebar).
+Produtos (Sugestões da IA + Produtos Canônicos + Itens Vinculados), Consulta,
+Aprovação de Cadastros (só para administradores) e Configurações.
 
 ## Rodando
 
