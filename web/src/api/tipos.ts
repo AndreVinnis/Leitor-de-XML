@@ -158,6 +158,27 @@ export interface ResultadoRevisaoLote {
   resultados: ResultadoRevisao[];
 }
 
+export interface ItemVinculado {
+  id: number;
+  nota_id: number;
+  nota_numero: string | null;
+  tipo: TipoNota;
+  fornecedor: string | null;
+  data_emissao: string | null;
+  descricao_original: string;
+  // Decimal serializado como string pela API -- ver NotaResumo.valor_total.
+  quantidade: string | null;
+  unidade: string | null;
+  valor_unitario: string | null;
+  valor_total: string | null;
+}
+
+export interface ListaItensVinculados {
+  produto_canonico: { id: number; nome_canonico: string; categoria: string | null };
+  itens: ItemVinculado[];
+  total: number;
+}
+
 // -- Consulta (app/api/routes_consulta.py) --------------------------------
 
 export interface ResultadoConsulta {

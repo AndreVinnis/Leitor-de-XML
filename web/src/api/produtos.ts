@@ -1,11 +1,13 @@
 import { get, patch, postJson } from "./cliente";
 import type {
   ListaCanonicos,
+  ListaItensVinculados,
   ListaSugestoes,
   ProdutoCanonico,
   ResultadoRevisao,
   ResultadoRevisaoLote,
   StatusRevisao,
+  TipoNota,
 } from "./tipos";
 
 interface ParametrosListarSugestoes {
@@ -93,5 +95,47 @@ export function editarCanonico(
       // chamador quer limpar, nunca ser confundido com "não enviar o campo".
       categoria: campos.categoria ?? null,
     }),
+  });
+}
+
+interface ParametrosListarItensVinculados {
+  produtoCanonicoId: number;
+  tipo?: TipoNota;
+  fornecedor?: string;
+  dataInicio?: string;
+  dataFim?: string;
+  busca?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export function listarItensVinculados(
+  params: ParametrosListarItensVinculados
+): Promise<ListaItensVinculados> {
+  const query = new URLSearchParams();
+  if (params.tipo) query.set("tipo", params.tipo);
+  if (params.fornecedor) query.set("fornecedor", params.fornecedor);
+  if (params.dataInicio) query.set("data_inicio", params.dataInicio);
+  if (params.dataFim) query.set("data_fim", params.dataFim);
+  if (params.busca) query.set("busca", params.busca);
+  query.set("limit", String(params.limit ?? 20));
+  query.set("offset", String(params.offset ?? 0));
+  return get<ListaItensVinculados>(
+    `/api/produtos/canonicos/${params.produtoCanonicoId}/itens?${query.toString()}`
+  );
+}
+
+/**
+ * Reatribui manualmente um item já vinculado a outro produto canônico --
+ * ação de edição na tela "Itens Vinculados", diferente de corrigirSugestao
+ * (que só vale enquanto a sugestão de origem ainda está pendente).
+ */
+export function reatribuirItem(
+  itemNotaId: number,
+  produtoCanonicoId: number
+): Promise<{ id: number; produto_canonico_id: number }> {
+  return patch<{ id: number; produto_canonico_id: number }>(`/api/produtos/itens/${itemNotaId}`, {
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ produto_canonico_id: produtoCanonicoId }),
   });
 }

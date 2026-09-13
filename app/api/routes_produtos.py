@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from fastapi import APIRouter, Body, Depends, HTTPException
 from sqlalchemy import func, or_
@@ -13,6 +13,7 @@ from app.models.models import (
     ProdutoCanonico,
     StatusRevisao,
     SugestaoNormalizacao,
+    TipoNota,
     Usuario,
 )
 from app.workers.tasks import normalizar_produtos_pendentes
@@ -95,6 +96,134 @@ async def listar_canonicos(
             for canonico, total_itens in resultados
         ]
         return {"itens": itens, "total": total}
+    finally:
+        db.close()
+
+
+@router.get("/canonicos/{produto_canonico_id}/itens")
+async def listar_itens_vinculados(
+    produto_canonico_id: int,
+    tipo: str | None = None,
+    fornecedor: str | None = None,
+    data_inicio: date | None = None,
+    data_fim: date | None = None,
+    busca: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+    usuario: Usuario = Depends(usuario_atual_ativo),
+):
+    """
+    Lista os itens de nota (entrada ou saída) já vinculados a um produto
+    canônico -- tela "Itens Vinculados ao Produto Canônico". Puramente
+    determinístico (join ItemNota + Nota por produto_canonico_id), sem IA
+    envolvida, no mesmo espírito do motor de reconciliação descrito na
+    documentação do projeto.
+    """
+    db: Session = SessionLocal()
+    try:
+        canonico = db.get(ProdutoCanonico, produto_canonico_id)
+        if canonico is None:
+            raise HTTPException(status_code=404, detail="produto canônico não encontrado")
+
+        query = (
+            db.query(ItemNota, Nota)
+            .join(Nota, Nota.id == ItemNota.nota_id)
+            .filter(ItemNota.produto_canonico_id == produto_canonico_id)
+        )
+
+        if tipo is not None:
+            try:
+                tipo_enum = TipoNota(tipo)
+            except ValueError:
+                raise HTTPException(status_code=400, detail=f"Tipo inválido: {tipo}")
+            query = query.filter(Nota.tipo == tipo_enum)
+        if fornecedor is not None:
+            query = query.filter(Nota.emitente_nome == fornecedor)
+        if data_inicio is not None:
+            query = query.filter(Nota.data_emissao >= data_inicio)
+        if data_fim is not None:
+            query = query.filter(Nota.data_emissao <= data_fim)
+        if busca is not None:
+            query = query.filter(ItemNota.descricao_original.ilike(f"%{busca}%"))
+
+        total = query.count()
+        resultados = (
+            query.order_by(Nota.data_emissao, Nota.numero).offset(offset).limit(limit).all()
+        )
+
+        itens = [
+            {
+                "id": item.id,
+                "nota_id": nota.id,
+                "nota_numero": nota.numero,
+                "tipo": nota.tipo.value,
+                "fornecedor": nota.emitente_nome,
+                "data_emissao": nota.data_emissao,
+                "descricao_original": item.descricao_original,
+                # Decimal serializado como string, não float: é dinheiro/quantidade
+                # (mesma convenção de app/api/routes_notas.py).
+                "quantidade": str(item.quantidade) if item.quantidade is not None else None,
+                "unidade": item.unidade,
+                "valor_unitario": str(item.valor_unitario) if item.valor_unitario is not None else None,
+                "valor_total": str(item.valor_total) if item.valor_total is not None else None,
+            }
+            for item, nota in resultados
+        ]
+        return {
+            "produto_canonico": {
+                "id": canonico.id,
+                "nome_canonico": canonico.nome_canonico,
+                "categoria": canonico.categoria,
+            },
+            "itens": itens,
+            "total": total,
+        }
+    finally:
+        db.close()
+
+
+@router.patch("/itens/{item_nota_id}")
+async def reatribuir_item(
+    item_nota_id: int,
+    produto_canonico_id: int = Body(..., embed=True),
+    usuario: Usuario = Depends(usuario_atual_ativo),
+):
+    """
+    Reatribui manualmente um item de nota já vinculado a outro produto
+    canônico -- ação de edição na tela "Itens Vinculados ao Produto
+    Canônico", para corrigir um vínculo depois que ele já foi confirmado
+    (diferente de POST /sugestoes/{id}/corrigir, que só se aplica enquanto a
+    sugestão ainda está pendente). Puramente determinístico, sem IA.
+    """
+    db: Session = SessionLocal()
+    try:
+        item = db.get(ItemNota, item_nota_id)
+        if item is None:
+            raise HTTPException(status_code=404, detail="item não encontrado")
+
+        nota = db.get(Nota, item.nota_id)
+        canonico_novo = db.get(ProdutoCanonico, produto_canonico_id)
+        if canonico_novo is None or canonico_novo.cliente_caso_id != nota.cliente_caso_id:
+            raise HTTPException(
+                status_code=400,
+                detail="produto_canonico_id inválido para o caso deste item",
+            )
+
+        produto_canonico_id_antigo = item.produto_canonico_id
+        item.produto_canonico_id = produto_canonico_id
+
+        db.add(
+            LogAuditoria(
+                usuario_id=usuario.id,
+                acao="reatribuicao_item_produto_canonico",
+                resultado_resumo=(
+                    f"Item {item_nota_id} ('{item.descricao_original}') reatribuído: "
+                    f"produto canônico {produto_canonico_id_antigo} -> {produto_canonico_id}"
+                ),
+            )
+        )
+        db.commit()
+        return {"id": item.id, "produto_canonico_id": item.produto_canonico_id}
     finally:
         db.close()
 
