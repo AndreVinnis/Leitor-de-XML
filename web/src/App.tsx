@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes } from "react-router-dom
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ProvedorAuth } from "./auth/ContextoAuth";
 import { RotaProtegida } from "./auth/RotaProtegida";
+import { RotaAdmin } from "./auth/RotaAdmin";
 import { ProvedorCasos, useCasos } from "./casos/ContextoCaso";
 import { ProvedorToast } from "./componentes/Toast";
 import { LayoutApp } from "./layout/LayoutApp";
@@ -11,6 +12,11 @@ import { Dashboard } from "./paginas/Dashboard/Dashboard";
 import { UploadXml } from "./paginas/UploadXml/UploadXml";
 import { NotasFiscais } from "./paginas/NotasFiscais/NotasFiscais";
 import { NotaFiscal } from "./paginas/NotaFiscal/NotaFiscal";
+import { Produtos } from "./paginas/Produtos/Produtos";
+import { ItensVinculados } from "./paginas/ItensVinculados/ItensVinculados";
+import { Consulta } from "./paginas/Consulta/Consulta";
+import { Configuracoes } from "./paginas/Configuracoes/Configuracoes";
+import { AprovacaoDeCadastros } from "./paginas/AprovacaoDeCadastros/AprovacaoDeCadastros";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -61,6 +67,16 @@ export function App() {
                     <Route path="casos/:casoId/upload" element={<UploadXml />} />
                     <Route path="casos/:casoId/notas" element={<NotasFiscais />} />
                     <Route path="casos/:casoId/notas/:notaId" element={<NotaFiscal />} />
+                    <Route path="casos/:casoId/produtos" element={<Produtos />} />
+                    <Route
+                      path="casos/:casoId/produtos/canonicos/:produtoCanonicoId"
+                      element={<ItensVinculados />}
+                    />
+                    <Route path="casos/:casoId/consulta" element={<Consulta />} />
+                    <Route path="casos/:casoId/configuracoes" element={<Configuracoes />} />
+                    <Route element={<RotaAdmin />}>
+                      <Route path="casos/:casoId/aprovacao-de-cadastros" element={<AprovacaoDeCadastros />} />
+                    </Route>
                   </Route>
                 </Route>
               </Route>

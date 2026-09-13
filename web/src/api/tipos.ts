@@ -3,12 +3,16 @@
 // tem schema de resposta para gerar isso automaticamente. Ver a seção 1.3
 // do plano de migração (fora de escopo desta fase, tratar como dívida).
 
+export type RoleUsuario = "comum" | "administrador";
+
+export type StatusCadastro = "pendente" | "aprovado" | "reprovado";
+
 export interface UsuarioLogado {
   id: number;
   email: string;
   nome: string;
-  role: "comum" | "administrador";
-  status_cadastro: "pendente" | "aprovado" | "reprovado";
+  role: RoleUsuario;
+  status_cadastro: StatusCadastro;
   is_active: boolean;
   is_superuser: boolean;
   is_verified: boolean;
@@ -109,4 +113,111 @@ export interface ProgressoLote {
   concluidos: number;
   com_erro: number;
   arquivos: ArquivoLoteProgresso[];
+}
+
+// -- Produtos (app/api/routes_produtos.py) --------------------------------
+
+export type StatusRevisao = "pendente" | "confirmado" | "rejeitado";
+
+export interface SugestaoNormalizacao {
+  id: number;
+  item_nota_id: number;
+  descricao_original: string;
+  produto_canonico_sugerido_id: number;
+  nome_canonico: string;
+  categoria: string | null;
+  fornecedor: string | null;
+  confianca: number;
+  status: StatusRevisao;
+  criado_em: string;
+}
+
+export interface ListaSugestoes {
+  itens: SugestaoNormalizacao[];
+  total: number;
+}
+
+export interface ProdutoCanonico {
+  id: number;
+  nome_canonico: string;
+  categoria: string | null;
+  itens_vinculados_count: number;
+}
+
+export interface ListaCanonicos {
+  itens: ProdutoCanonico[];
+  total: number;
+}
+
+// As rotas de revisão (confirmar/rejeitar/corrigir, unitárias e em lote)
+// devolvem sempre HTTP 200 -- o campo "status" do corpo é que diz se deu
+// certo. Ver comentário de app/api/routes_produtos.py::_revisar.
+export interface ResultadoRevisao {
+  status: "ok" | "erro";
+  sugestao_id?: number;
+  motivo?: string;
+}
+
+export interface ResultadoRevisaoLote {
+  resultados: ResultadoRevisao[];
+}
+
+export interface ItemVinculado {
+  id: number;
+  nota_id: number;
+  nota_numero: string | null;
+  tipo: TipoNota;
+  fornecedor: string | null;
+  data_emissao: string | null;
+  descricao_original: string;
+  // Decimal serializado como string pela API -- ver NotaResumo.valor_total.
+  quantidade: string | null;
+  unidade: string | null;
+  valor_unitario: string | null;
+  valor_total: string | null;
+}
+
+export interface ListaItensVinculados {
+  produto_canonico: { id: number; nome_canonico: string; categoria: string | null };
+  itens: ItemVinculado[];
+  total: number;
+}
+
+// -- Consulta (app/api/routes_consulta.py) --------------------------------
+
+export interface ResultadoConsulta {
+  pergunta: string;
+  sql_gerado: string;
+  colunas: string[];
+  linhas: unknown[][];
+  total_linhas: number;
+}
+
+// -- Usuários / Aprovação de Cadastros (app/api/routes_usuarios.py) -------
+
+export interface UsuarioAdmin {
+  id: number;
+  nome: string;
+  email: string;
+  role: RoleUsuario;
+  status_cadastro: StatusCadastro;
+  is_active: boolean;
+  criado_em: string;
+}
+
+export interface ListaUsuarios {
+  itens: UsuarioAdmin[];
+  total: number;
+}
+
+// Aprovar/reprovar (unitário e em lote) devolvem sempre HTTP 200 -- ver
+// comentário de app/api/routes_usuarios.py::_decidir_cadastro.
+export interface ResultadoDecisaoCadastro {
+  status: "ok" | "erro";
+  usuario_id?: number;
+  motivo?: string;
+}
+
+export interface ResultadoDecisaoCadastroLote {
+  resultados: ResultadoDecisaoCadastro[];
 }

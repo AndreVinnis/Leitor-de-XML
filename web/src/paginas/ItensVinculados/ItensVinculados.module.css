@@ -1,0 +1,175 @@
+.pagina {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-4);
+}
+
+.linkVoltar {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--cor-texto-secundario);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.cabecalho {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tituloLinha {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+}
+
+.titulo {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--cor-texto);
+  margin: 0;
+}
+
+.pilulaCategoria {
+  display: inline-flex;
+  padding: 5px 10px;
+  border-radius: var(--raio-pill);
+  background: var(--cor-superficie-alt);
+  border: 1px solid var(--cor-borda);
+  color: var(--cor-texto-secundario);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.subtitulo {
+  font-size: 14px;
+  color: var(--cor-texto-secundario);
+  margin: 0;
+}
+
+.barraFiltros {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  flex-wrap: wrap;
+}
+
+.tab {
+  height: 34px;
+  padding: 0 16px;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-borda);
+  background: var(--cor-superficie);
+  color: var(--cor-texto-secundario);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.tabAtiva {
+  background: var(--cor-primaria);
+  border-color: var(--cor-primaria);
+  color: var(--cor-texto-on-primaria);
+}
+
+.campoFiltro {
+  height: 34px;
+  width: 180px;
+  padding: 0 12px;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-borda);
+  background: var(--cor-superficie);
+  color: var(--cor-texto);
+  font-size: 13px;
+}
+
+.campoData {
+  width: 140px;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-borda);
+  background: var(--cor-superficie);
+  color: var(--cor-texto-secundario);
+  font-size: 13px;
+}
+
+.espacador {
+  flex: 1 0 0;
+}
+
+.campoBusca {
+  width: 260px;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-borda);
+  background: var(--cor-superficie);
+  color: var(--cor-texto);
+  font-size: 13px;
+}
+
+.tituloCard {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--cor-texto);
+  margin: 0 0 var(--espaco-2) 0;
+}
+
+.acaoEditar {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  border: 1px solid var(--cor-borda);
+  background: var(--cor-superficie);
+  color: var(--cor-texto-secundario);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.formModal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-3);
+}
+
+.itemDescricao {
+  font-size: 13px;
+  color: var(--cor-texto-secundario);
+  margin: 0;
+}
+
+.grupoCampo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-1);
+}
+
+.rotuloCampo {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--cor-texto-secundario);
+}
+
+.selectNativo {
+  height: 43px;
+  padding: 0 14px;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-borda);
+  background: var(--cor-superficie);
+  color: var(--cor-texto);
+  font-size: var(--tamanho-texto-base);
+}
+
+.acoesModal {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--espaco-3);
+}

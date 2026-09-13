@@ -221,14 +221,20 @@ def status_normalizacao(task_id: str) -> dict:
 
 
 def listar_canonicos(cliente_caso_id: int) -> list:
-    """Lista nua (sem envelope), diferente de /api/notas e /sugestoes."""
+    """
+    Devolve a lista nua de canônicos (sem paginação): a rota passou a
+    devolver o envelope {"itens", "total"} + contagem de itens vinculados
+    (para a tela de Produtos Canônicos do React), mas as telas do Streamlit
+    só precisam da lista completa para popular selectbox/filtro -- o
+    unwrap fica aqui para não mexer em cada chamador.
+    """
     resposta = requests.get(
         f"{BASE_URL}/api/produtos/canonicos",
-        params={"cliente_caso_id": cliente_caso_id},
+        params={"cliente_caso_id": cliente_caso_id, "limit": 1000},
         headers=_cabecalhos(),
         timeout=TIMEOUT_PADRAO,
     )
-    return _tratar_resposta(resposta)
+    return _tratar_resposta(resposta)["itens"]
 
 
 def criar_canonico(cliente_caso_id: int, nome_canonico: str, categoria: str | None = None) -> dict:

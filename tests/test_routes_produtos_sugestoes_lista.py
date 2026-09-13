@@ -312,9 +312,9 @@ def test_listar_canonicos_do_caso(client, db_session_factory, logar_usuario):
 
     assert resp.status_code == 200
     corpo = resp.json()
-    assert len(corpo) == 1
-    assert corpo[0]["nome_canonico"] == "Item A"
-    assert corpo[0]["categoria"] == "Cat A"
+    assert corpo["total"] == 1
+    assert corpo["itens"][0]["nome_canonico"] == "Item A"
+    assert corpo["itens"][0]["categoria"] == "Cat A"
 
 
 def test_listar_canonicos_sem_autenticacao_retorna_401(client, db_session_factory):

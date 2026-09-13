@@ -3,6 +3,7 @@ from datetime import datetime
 
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
+from sqlalchemy.orm import Session
 
 from app.core.auth import auth_backend, fastapi_users
 from app.core.database import SessionLocal
@@ -23,6 +24,29 @@ def _pagina(titulo: str, mensagem: str) -> HTMLResponse:
     return HTMLResponse(
         f"<html><body><h1>{html.escape(titulo)}</h1><p>{html.escape(mensagem)}</p></body></html>"
     )
+
+
+def efetivar_decisao_cadastro(db: Session, usuario: Usuario, admin_id: int, aprovado: bool) -> None:
+    """
+    Efetiva a decisão de aprovar/reprovar um cadastro: muda status_cadastro e
+    is_active, grava quem decidiu, registra o LogAuditoria e dispara a
+    notificação por e-mail ao próprio usuário. Não commita -- compartilhado
+    entre o fluxo por link assinado de e-mail (_processar_decisao, abaixo) e
+    o fluxo autenticado via API (app/api/routes_usuarios.py).
+    """
+    usuario.status_cadastro = StatusCadastro.APROVADO if aprovado else StatusCadastro.REPROVADO
+    usuario.is_active = aprovado
+    usuario.aprovado_por_usuario_id = admin_id
+    usuario.aprovado_em = datetime.utcnow()
+
+    db.add(
+        LogAuditoria(
+            usuario_id=admin_id,
+            acao="aprovacao_cadastro" if aprovado else "reprovacao_cadastro",
+            resultado_resumo=f"Cadastro de {usuario.email} {'aprovado' if aprovado else 'reprovado'}",
+        )
+    )
+    enviar_notificacao_resultado_cadastro.delay(usuario.id, aprovado)
 
 
 @router.get("/aprovar-cadastro")
@@ -67,21 +91,8 @@ def _processar_decisao(token: str, acao_esperada: str) -> HTMLResponse:
             )
 
         aprovado = acao_esperada == "aprovar"
-        usuario.status_cadastro = StatusCadastro.APROVADO if aprovado else StatusCadastro.REPROVADO
-        usuario.is_active = aprovado
-        usuario.aprovado_por_usuario_id = admin.id
-        usuario.aprovado_em = datetime.utcnow()
-
-        db.add(
-            LogAuditoria(
-                usuario_id=admin.id,
-                acao="aprovacao_cadastro" if aprovado else "reprovacao_cadastro",
-                resultado_resumo=f"Cadastro de {usuario.email} {'aprovado' if aprovado else 'reprovado'}",
-            )
-        )
+        efetivar_decisao_cadastro(db, usuario, admin.id, aprovado)
         db.commit()
-
-        enviar_notificacao_resultado_cadastro.delay(usuario.id, aprovado)
 
         return _pagina(
             "Cadastro aprovado" if aprovado else "Cadastro reprovado",
