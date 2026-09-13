@@ -11,6 +11,8 @@ import { Dashboard } from "./paginas/Dashboard/Dashboard";
 import { UploadXml } from "./paginas/UploadXml/UploadXml";
 import { NotasFiscais } from "./paginas/NotasFiscais/NotasFiscais";
 import { NotaFiscal } from "./paginas/NotaFiscal/NotaFiscal";
+import { Produtos } from "./paginas/Produtos/Produtos";
+import { Consulta } from "./paginas/Consulta/Consulta";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -61,6 +63,8 @@ export function App() {
                     <Route path="casos/:casoId/upload" element={<UploadXml />} />
                     <Route path="casos/:casoId/notas" element={<NotasFiscais />} />
                     <Route path="casos/:casoId/notas/:notaId" element={<NotaFiscal />} />
+                    <Route path="casos/:casoId/produtos" element={<Produtos />} />
+                    <Route path="casos/:casoId/consulta" element={<Consulta />} />
                   </Route>
                 </Route>
               </Route>

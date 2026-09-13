@@ -6,9 +6,10 @@ ver `frontend/README.md` e a seção correspondente no `CLAUDE.md` do repo).
 Vite + React + TypeScript, CSS Modules (sem Tailwind), primitivos do Radix
 UI para os componentes que exigem acessibilidade (`Select`, `Toast`).
 
-Fase atual: Login + Dashboard. Ver
-`C:\Users\andre\.claude\plans\quero-come-ar-a-migra-o-hashed-pixel.md` para
-o plano completo e as fases seguintes.
+Fase atual: Login, Criar Conta, Dashboard, Upload de XML, Notas Fiscais,
+Produtos (Sugestões da IA + Produtos Canônicos) e Consulta. Faltam Itens
+Vinculados por produto canônico, Aprovação de Cadastros e Configurações
+(ainda placeholders na sidebar).
 
 ## Rodando
 
@@ -59,9 +60,9 @@ enquanto.
    `/api/consulta`). Com barra, o backend responde 307 e o redirect pode
    perder o header `Authorization`.
 3. **200 com erro no corpo** nas rotas de revisão de sugestão de produto
-   (`app/api/routes_produtos.py`). Ainda não há tela que use isso (chega na
-   fase de Normalização), mas o wrapper de fetch já está pronto pra
-   promover esse caso a exceção.
+   (`app/api/routes_produtos.py`). A tela de Produtos (`src/paginas/Produtos/`)
+   trata isso na própria página, inspecionando o campo `status` do retorno --
+   o wrapper de fetch (`api/cliente.ts`) não promove esse caso a exceção.
 
 ## Estrutura
 
@@ -72,11 +73,10 @@ src/
   casos/       ContextoCaso (lista de casos, caso ativo vem da URL)
   componentes/ Botao, CampoTexto, Card, CardMetrica, Tabela, Paginacao, Select, Toast
   layout/      LayoutApp (sidebar + seletor de caso, espelha a sidebar do Streamlit)
-  paginas/     uma pasta por tela (Login, Dashboard)
+  paginas/     uma pasta por tela (Login, Dashboard, Produtos, Consulta, ...)
   estilos/     tokens.css (variáveis de design) + global.css
 ```
 
-`estilos/tokens.css` está com uma paleta **placeholder**, ainda sem os
-valores reais do protótipo Figma (aguardando o MCP do Figma ser conectado --
-ver Etapa 3 do plano). Trocar os valores lá não deveria exigir tocar em
-nenhum componente.
+`estilos/tokens.css` já tem os valores reais do protótipo Figma (conferidos
+via MCP do Figma). Trocar os valores lá não deveria exigir tocar em nenhum
+componente.

@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Body, Depends, HTTPException
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.core.auth import usuario_atual_ativo
@@ -44,21 +44,57 @@ async def status_normalizacao(task_id: str, usuario: Usuario = Depends(usuario_a
 @router.get("/canonicos")
 async def listar_canonicos(
     cliente_caso_id: int,
+    categoria: str | None = None,
+    busca: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
     usuario: Usuario = Depends(usuario_atual_ativo),
 ):
-    """Lista os produtos canônicos de um caso, para popular o filtro "Categoria" da tela."""
+    """
+    Lista os produtos canônicos de um caso, com a contagem de itens de nota
+    já vinculados a cada um (tela "Produtos Canônicos"). `categoria`/`busca`
+    filtram por igualdade/ilike; devolve o mesmo envelope {"itens", "total"}
+    de /sugestoes e /api/notas, paginável via `limit`/`offset`.
+    """
     db: Session = SessionLocal()
     try:
-        canonicos = (
-            db.query(ProdutoCanonico)
-            .filter(ProdutoCanonico.cliente_caso_id == cliente_caso_id)
-            .order_by(ProdutoCanonico.nome_canonico)
-            .all()
+        contagem_itens = (
+            db.query(
+                ItemNota.produto_canonico_id.label("produto_canonico_id"),
+                func.count(ItemNota.id).label("total_itens"),
+            )
+            .group_by(ItemNota.produto_canonico_id)
+            .subquery()
         )
-        return [
-            {"id": c.id, "nome_canonico": c.nome_canonico, "categoria": c.categoria}
-            for c in canonicos
+
+        query = (
+            db.query(ProdutoCanonico, contagem_itens.c.total_itens)
+            .outerjoin(
+                contagem_itens, contagem_itens.c.produto_canonico_id == ProdutoCanonico.id
+            )
+            .filter(ProdutoCanonico.cliente_caso_id == cliente_caso_id)
+        )
+
+        if categoria is not None:
+            query = query.filter(ProdutoCanonico.categoria == categoria)
+        if busca is not None:
+            query = query.filter(ProdutoCanonico.nome_canonico.ilike(f"%{busca}%"))
+
+        total = query.count()
+        resultados = (
+            query.order_by(ProdutoCanonico.nome_canonico).offset(offset).limit(limit).all()
+        )
+
+        itens = [
+            {
+                "id": canonico.id,
+                "nome_canonico": canonico.nome_canonico,
+                "categoria": canonico.categoria,
+                "itens_vinculados_count": total_itens or 0,
+            }
+            for canonico, total_itens in resultados
         ]
+        return {"itens": itens, "total": total}
     finally:
         db.close()
 

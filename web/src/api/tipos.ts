@@ -110,3 +110,60 @@ export interface ProgressoLote {
   com_erro: number;
   arquivos: ArquivoLoteProgresso[];
 }
+
+// -- Produtos (app/api/routes_produtos.py) --------------------------------
+
+export type StatusRevisao = "pendente" | "confirmado" | "rejeitado";
+
+export interface SugestaoNormalizacao {
+  id: number;
+  item_nota_id: number;
+  descricao_original: string;
+  produto_canonico_sugerido_id: number;
+  nome_canonico: string;
+  categoria: string | null;
+  fornecedor: string | null;
+  confianca: number;
+  status: StatusRevisao;
+  criado_em: string;
+}
+
+export interface ListaSugestoes {
+  itens: SugestaoNormalizacao[];
+  total: number;
+}
+
+export interface ProdutoCanonico {
+  id: number;
+  nome_canonico: string;
+  categoria: string | null;
+  itens_vinculados_count: number;
+}
+
+export interface ListaCanonicos {
+  itens: ProdutoCanonico[];
+  total: number;
+}
+
+// As rotas de revisão (confirmar/rejeitar/corrigir, unitárias e em lote)
+// devolvem sempre HTTP 200 -- o campo "status" do corpo é que diz se deu
+// certo. Ver comentário de app/api/routes_produtos.py::_revisar.
+export interface ResultadoRevisao {
+  status: "ok" | "erro";
+  sugestao_id?: number;
+  motivo?: string;
+}
+
+export interface ResultadoRevisaoLote {
+  resultados: ResultadoRevisao[];
+}
+
+// -- Consulta (app/api/routes_consulta.py) --------------------------------
+
+export interface ResultadoConsulta {
+  pergunta: string;
+  sql_gerado: string;
+  colunas: string[];
+  linhas: unknown[][];
+  total_linhas: number;
+}
