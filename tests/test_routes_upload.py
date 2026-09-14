@@ -1,6 +1,7 @@
 from io import BytesIO
 from unittest.mock import MagicMock
 
+from app.api.routes_upload import UPLOAD_DIR
 from app.models.models import (
     ArquivoLote,
     ClienteCaso,
@@ -87,3 +88,57 @@ def test_upload_persiste_lote_e_arquivos_antes_de_enfileirar(
     assert all(a.status == StatusProcessamento.PENDENTE for a in arquivos_db)
     assert all(a.task_id == "fake-task-id" for a in arquivos_db)
     session.close()
+
+
+def test_upload_rejeita_arquivo_com_extensao_invalida_sem_enfileirar(
+    client, db_session_factory, logar_usuario, monkeypatch
+):
+    """
+    Lote misto: 1 .xml válido + 1 .txt. O .txt vira ArquivoLote com
+    status=ERRO e motivo_erro explicando a extensão, sem ser salvo em disco
+    nem enfileirado -- só o .xml chama processar_xml_nfe.delay.
+    """
+    fake_task = MagicMock()
+    fake_task.id = "fake-task-id"
+    fake_processar = MagicMock()
+    fake_processar.delay = MagicMock(return_value=fake_task)
+    monkeypatch.setattr("app.api.routes_upload.processar_xml_nfe", fake_processar)
+
+    session = db_session_factory()
+    usuario = _criar_usuario(session)
+    caso = _criar_caso(session)
+    session.close()
+    logar_usuario(usuario)
+
+    arquivos = [
+        ("arquivos", ("nota1.xml", BytesIO(b"<a/>"), "text/xml")),
+        ("arquivos", ("nota2.txt", BytesIO(b"nao e xml"), "text/plain")),
+    ]
+    resp = client.post(
+        "/api/notas/upload",
+        data={"cliente_caso_id": caso.id, "cnpj_cliente": CNPJ_CLIENTE},
+        files=arquivos,
+    )
+    assert resp.status_code == 200
+    corpo = resp.json()
+    lote_id = corpo["lote_id"]
+
+    assert fake_processar.delay.call_count == 1
+    assert corpo["task_ids"] == ["fake-task-id"]
+
+    session = db_session_factory()
+    lote = session.get(Lote, lote_id)
+    assert lote.total_arquivos == 2
+
+    arquivos_db = {
+        a.nome_arquivo: a for a in session.query(ArquivoLote).filter_by(lote_id=lote_id)
+    }
+    assert arquivos_db["nota1.xml"].status == StatusProcessamento.PENDENTE
+    assert arquivos_db["nota1.xml"].task_id == "fake-task-id"
+
+    assert arquivos_db["nota2.txt"].status == StatusProcessamento.ERRO
+    assert arquivos_db["nota2.txt"].motivo_erro == "extensão não suportada, esperado .xml"
+    assert arquivos_db["nota2.txt"].task_id is None
+    session.close()
+
+    assert not (UPLOAD_DIR / lote_id / "nota2.txt").exists()

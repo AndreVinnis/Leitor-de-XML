@@ -50,13 +50,29 @@ async def upload_notas(
 
         arquivos_lote = []
         for arquivo in arquivos:
-            destino = lote_dir / arquivo.filename
+            nome = arquivo.filename or ""
+
+            # Extensão errada não deve travar o lote inteiro nem chegar a
+            # tocar o disco -- vira ArquivoLote com ERRO direto, no mesmo
+            # padrão de motivo_erro usado para XML malformado/não-NFe.
+            if not nome.lower().endswith(".xml"):
+                arquivo_lote = ArquivoLote(
+                    lote_id=lote.id,
+                    nome_arquivo=nome,
+                    status=StatusProcessamento.ERRO,
+                    motivo_erro="extensão não suportada, esperado .xml",
+                )
+                db.add(arquivo_lote)
+                db.flush()
+                continue
+
+            destino = lote_dir / nome
             with destino.open("wb") as f:
                 shutil.copyfileobj(arquivo.file, f)
 
             arquivo_lote = ArquivoLote(
                 lote_id=lote.id,
-                nome_arquivo=arquivo.filename,
+                nome_arquivo=nome,
                 status=StatusProcessamento.PENDENTE,
             )
             db.add(arquivo_lote)

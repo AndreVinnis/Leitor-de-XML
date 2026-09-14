@@ -78,7 +78,23 @@ export function UploadXml() {
 
   function adicionarArquivos(novos: FileList | null) {
     if (!novos || novos.length === 0) return;
-    setArquivos((atuais) => [...atuais, ...Array.from(novos)]);
+
+    const validos: File[] = [];
+    const rejeitados: string[] = [];
+    for (const arquivo of Array.from(novos)) {
+      if (arquivo.name.toLowerCase().endsWith(".xml")) {
+        validos.push(arquivo);
+      } else {
+        rejeitados.push(arquivo.name);
+      }
+    }
+
+    if (rejeitados.length > 0) {
+      notificar(`Arquivo(s) ignorado(s) por não serem .xml: ${rejeitados.join(", ")}`, "erro");
+    }
+    if (validos.length > 0) {
+      setArquivos((atuais) => [...atuais, ...validos]);
+    }
   }
 
   function removerArquivo(indice: number) {
