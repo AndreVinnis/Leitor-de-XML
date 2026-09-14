@@ -2,7 +2,11 @@ from unittest.mock import patch
 
 from app.ai.normalizador_produtos import SugestaoIA
 from app.models.models import ClienteCaso, ItemNota, Nota, ProdutoCanonico, TipoNota
-from app.workers.tasks import normalizar_produtos_pendentes
+from app.workers.tasks import (
+    LIMIAR_FILTRO_EMBEDDING,
+    TOP_K_CANDIDATOS,
+    normalizar_produtos_pendentes,
+)
 
 
 def _criar_caso(session, nome):
@@ -92,3 +96,93 @@ def test_sem_itens_pendentes_no_caso_nao_chama_ia(mock_sugerir, db_session_facto
 
     assert resultado == {"status": "ok", "descricoes_unicas": 0, "sugestoes_criadas": 0}
     mock_sugerir.assert_not_called()
+
+
+@patch("app.workers.tasks.sugerir_normalizacao")
+def test_catalogo_pequeno_mantem_lista_cheia_sem_prefiltro(mock_sugerir, db_session_factory):
+    """
+    Catálogo abaixo de LIMIAR_FILTRO_EMBEDDING: comportamento inalterado --
+    a lista de canônicos passada à IA continua sendo o catálogo inteiro, sem
+    passar pelo pré-filtro de embedding.
+    """
+    session = db_session_factory()
+    caso = _criar_caso(session, "Cliente Pequeno")
+    canonico = ProdutoCanonico(cliente_caso_id=caso.id, nome_canonico="Arroz Tio Joao 5kg")
+    session.add(canonico)
+    session.commit()
+    session.refresh(canonico)
+
+    _criar_item_pendente(session, caso.id, "7" * 44, "ARROZ TIO JOAO 5KG")
+    session.close()
+
+    mock_sugerir.return_value = [
+        SugestaoIA(
+            descricao_original="ARROZ TIO JOAO 5KG",
+            confianca=0.98,
+            produto_canonico_id=canonico.id,
+        )
+    ]
+
+    normalizar_produtos_pendentes(caso.id)
+
+    _, candidatos = mock_sugerir.call_args[0]
+    assert candidatos == [
+        {"id": canonico.id, "nome_canonico": "Arroz Tio Joao 5kg", "categoria": None}
+    ]
+
+
+@patch("app.workers.tasks.gerar_embeddings")
+@patch("app.workers.tasks.sugerir_normalizacao")
+def test_catalogo_grande_usa_prefiltro_de_embedding(mock_sugerir, mock_embeddings, db_session_factory):
+    """
+    Catálogo acima de LIMIAR_FILTRO_EMBEDDING: a lista de canônicos passada
+    à IA deixa de ser o catálogo inteiro e passa a ser só os candidatos mais
+    similares (por embedding) à descrição, incluindo o match correto.
+    """
+    session = db_session_factory()
+    caso = _criar_caso(session, "Cliente Grande")
+
+    # LIMIAR_FILTRO_EMBEDDING + 1 canônicos, cada um com um embedding
+    # one-hot ortogonal aos demais -- só o "alvo" fica idêntico ao embedding
+    # que a descrição vai receber (mockado abaixo).
+    total_canonicos = LIMIAR_FILTRO_EMBEDDING + 1
+    for i in range(total_canonicos):
+        vetor = [0.0] * total_canonicos
+        vetor[i] = 1.0
+        session.add(
+            ProdutoCanonico(
+                cliente_caso_id=caso.id,
+                nome_canonico=f"Produto {i}",
+                embedding=vetor,
+            )
+        )
+    session.commit()
+
+    alvo = session.query(ProdutoCanonico).filter_by(nome_canonico="Produto 3").one()
+    alvo_id = alvo.id
+
+    _criar_item_pendente(session, caso.id, "6" * 44, "DESCRICAO QUALQUER")
+    session.close()
+
+    vetor_descricao = [0.0] * total_canonicos
+    vetor_descricao[3] = 1.0
+    mock_embeddings.return_value = [vetor_descricao]
+
+    mock_sugerir.return_value = [
+        SugestaoIA(
+            descricao_original="DESCRICAO QUALQUER",
+            confianca=0.9,
+            produto_canonico_id=alvo_id,
+        )
+    ]
+
+    resultado = normalizar_produtos_pendentes(caso.id)
+    assert resultado["sugestoes_criadas"] == 1
+
+    mock_embeddings.assert_called_once()
+    _, candidatos = mock_sugerir.call_args[0]
+    ids_candidatos = {c["id"] for c in candidatos}
+
+    assert len(candidatos) <= TOP_K_CANDIDATOS
+    assert len(candidatos) < total_canonicos
+    assert alvo_id in ids_candidatos

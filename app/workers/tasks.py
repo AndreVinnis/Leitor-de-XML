@@ -1,3 +1,4 @@
+from app.ai.embeddings import gerar_embeddings, selecionar_candidatos_similares
 from app.ai.normalizador_produtos import sugerir_normalizacao
 from app.core.config import settings
 from app.core.database import SessionLocal
@@ -20,6 +21,15 @@ from app.parsers.nfe_parser import NFeParseError, classificar_tipo, parse_nfe_xm
 from app.workers.celery_app import celery_app
 
 TAMANHO_LOTE_IA = 50
+
+# Pré-filtro por embeddings: catálogos até esse tamanho continuam indo
+# inteiros no prompt (comportamento e precisão de hoje, sem custo extra de
+# embedding). Acima disso, cada lote recebe só a união dos TOP_K_CANDIDATOS
+# canônicos mais similares (cosseno) a cada descrição do lote, capada em
+# MAX_CANDIDATOS_POR_LOTE -- ver app/ai/embeddings.py.
+LIMIAR_FILTRO_EMBEDDING = 150
+TOP_K_CANDIDATOS = 15
+MAX_CANDIDATOS_POR_LOTE = 150
 
 
 def _atualizar_status_arquivo_lote(db, arquivo_lote_id: int, resultado: dict | None) -> None:
@@ -273,23 +283,52 @@ def normalizar_produtos_pendentes(cliente_caso_id: int) -> dict:
             grupos.setdefault(chave, []).append(item)
             descricao_original_por_chave.setdefault(chave, item.descricao_original)
 
-        canonicos_existentes = [
-            {"id": c.id, "nome_canonico": c.nome_canonico, "categoria": c.categoria}
-            for c in db.query(ProdutoCanonico)
+        canonicos_orm = (
+            db.query(ProdutoCanonico)
             .filter(ProdutoCanonico.cliente_caso_id == cliente_caso_id)
             .all()
+        )
+        canonicos_existentes = [
+            {"id": c.id, "nome_canonico": c.nome_canonico, "categoria": c.categoria}
+            for c in canonicos_orm
         ]
+        canonicos_por_id = {c["id"]: c for c in canonicos_existentes}
         ids_canonicos_existentes = {c["id"] for c in canonicos_existentes}
+        embeddings_canonicos = {c.id: c.embedding for c in canonicos_orm if c.embedding}
 
         chaves = list(grupos.keys())
         sugestoes_criadas = 0
         produtos_canonicos_criados = 0
 
+        # Catálogo pequeno: mantém o comportamento de sempre (lista cheia no
+        # prompt, sem custo de embedding). Catálogo grande: gera embedding de
+        # cada descrição uma vez, de antemão, e usa como pré-filtro em cada
+        # lote -- ver LIMIAR_FILTRO_EMBEDDING acima.
+        usar_filtro_embedding = len(canonicos_existentes) > LIMIAR_FILTRO_EMBEDDING
+        embeddings_descricoes: dict[str, list[float]] = {}
+        if usar_filtro_embedding:
+            vetores = gerar_embeddings(
+                [descricao_original_por_chave[c] for c in chaves], task_type="RETRIEVAL_QUERY"
+            )
+            embeddings_descricoes = dict(zip(chaves, vetores))
+
         for i in range(0, len(chaves), TAMANHO_LOTE_IA):
             lote_chaves = chaves[i : i + TAMANHO_LOTE_IA]
             descricoes_lote = [descricao_original_por_chave[c] for c in lote_chaves]
 
-            resultados = sugerir_normalizacao(descricoes_lote, canonicos_existentes)
+            if usar_filtro_embedding:
+                ids_candidatos = selecionar_candidatos_similares(
+                    lote_chaves,
+                    embeddings_descricoes,
+                    embeddings_canonicos,
+                    top_k=TOP_K_CANDIDATOS,
+                    max_total=MAX_CANDIDATOS_POR_LOTE,
+                )
+                candidatos_lote = [canonicos_por_id[cid] for cid in ids_candidatos]
+            else:
+                candidatos_lote = canonicos_existentes
+
+            resultados = sugerir_normalizacao(descricoes_lote, candidatos_lote)
 
             resultados_por_chave = {
                 _normalizar_chave(r.descricao_original): r for r in resultados
@@ -312,10 +351,24 @@ def normalizar_produtos_pendentes(cliente_caso_id: int) -> dict:
                         nome_canonico=resultado.novo_produto_canonico.nome_canonico,
                         categoria=resultado.novo_produto_canonico.categoria,
                     )
+                    novo.embedding = gerar_embeddings([novo.nome_canonico])[0]
                     db.add(novo)
                     db.flush()  # garante novo.id
                     produto_canonico_id = novo.id
                     ids_canonicos_existentes.add(produto_canonico_id)
+                    # Registra o canônico recém-criado nas estruturas em
+                    # memória -- sem isso, ele só existiria como id válido
+                    # para a próxima chamada da IA, mas não apareceria como
+                    # candidato real (nem na lista cheia, nem no pré-filtro
+                    # de embedding) nos lotes seguintes desta mesma execução.
+                    novo_dict = {
+                        "id": novo.id,
+                        "nome_canonico": novo.nome_canonico,
+                        "categoria": novo.categoria,
+                    }
+                    canonicos_existentes.append(novo_dict)
+                    canonicos_por_id[novo.id] = novo_dict
+                    embeddings_canonicos[novo.id] = novo.embedding
                     produtos_canonicos_criados += 1
 
                 for item in grupos[chave]:
