@@ -1,13 +1,20 @@
-import { useRef, useState, type DragEvent, type FormEvent } from "react";
+import { useEffect, useRef, useState, type DragEvent, type FormEvent } from "react";
 import { useParams } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { progressoLote, uploadNotas } from "../../api/notas";
 import { ErroApi } from "../../api/cliente";
+import { useCasos } from "../../casos/ContextoCaso";
 import { useToast } from "../../componentes/Toast";
 import { Card } from "../../componentes/Card";
 import { Botao } from "../../componentes/Botao";
 import { CampoTexto } from "../../componentes/CampoTexto";
+import { Badge, type StatusBadge } from "../../componentes/Badge";
+import { Paginacao } from "../../componentes/Paginacao";
+import { formatarCnpj } from "../../utilitarios/formatarCnpj";
+import type { StatusNota } from "../../api/tipos";
 import estilos from "./UploadXml.module.css";
+
+const ITENS_POR_PAGINA = 30;
 
 function formatarTamanho(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -15,19 +22,37 @@ function formatarTamanho(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function statusParaBadge(status: StatusNota | null): StatusBadge {
+  return status === "duplicado" ? "neutro" : status ?? "pendente";
+}
+
 export function UploadXml() {
   const { casoId } = useParams<{ casoId: string }>();
   const casoIdNumero = Number(casoId);
+  const { casos } = useCasos();
+  const casoAtivo = casos.find((caso) => String(caso.id) === casoId);
   const { notificar } = useToast();
 
-  const [cnpjCliente, setCnpjCliente] = useState("");
   const [arquivos, setArquivos] = useState<File[]>([]);
+  const [offsetArquivos, setOffsetArquivos] = useState(0);
   const [loteId, setLoteId] = useState<string | null>(null);
+  const [offsetProgresso, setOffsetProgresso] = useState(0);
   const [arrastando, setArrastando] = useState(false);
   const inputArquivosRef = useRef<HTMLInputElement>(null);
 
+  // Reseta a paginação quando a lista muda de "fonte" -- lote novo enviado,
+  // ou lista de arquivos selecionados esvaziada (após envio) -- senão o
+  // offset antigo pode ficar além do novo total e não mostrar nada.
+  useEffect(() => {
+    setOffsetProgresso(0);
+  }, [loteId]);
+
+  useEffect(() => {
+    if (arquivos.length === 0) setOffsetArquivos(0);
+  }, [arquivos.length]);
+
   const upload = useMutation({
-    mutationFn: () => uploadNotas(casoIdNumero, cnpjCliente, arquivos),
+    mutationFn: () => uploadNotas(casoIdNumero, casoAtivo!.cnpj_cliente!, arquivos),
     onSuccess: (resposta) => {
       setLoteId(resposta.lote_id);
       notificar(`Lote enviado: ${resposta.total_arquivos} arquivo(s) em processamento.`);
@@ -68,8 +93,8 @@ export function UploadXml() {
 
   function handleSubmitUpload(evento: FormEvent) {
     evento.preventDefault();
-    if (!cnpjCliente || arquivos.length === 0) {
-      notificar("Informe o CNPJ do cliente e selecione ao menos um arquivo XML.", "erro");
+    if (!casoAtivo?.cnpj_cliente || arquivos.length === 0) {
+      notificar("Este caso precisa ter um CNPJ cadastrado e ao menos um arquivo XML selecionado.", "erro");
       return;
     }
     upload.mutate();
@@ -84,13 +109,28 @@ export function UploadXml() {
         <p className={estilos.subtitulo}>Envie em lote os XMLs de NF-e de entrada e saída do caso selecionado</p>
       </div>
 
-      <CampoTexto
-        rotulo="CNPJ do cliente"
-        placeholder="00.000.000/0000-00"
-        value={cnpjCliente}
-        onChange={(evento) => setCnpjCliente(evento.target.value)}
-        className={estilos.campoCnpj}
-      />
+      <div className={estilos.linhaCamposCaso}>
+        <CampoTexto
+          rotulo="Nome do Cliente"
+          placeholder="Nome do cliente"
+          value={casoAtivo?.nome_cliente ?? ""}
+          disabled
+          className={estilos.campoInfoCaso}
+        />
+        <CampoTexto
+          rotulo="CNPJ do cliente"
+          placeholder="00.000.000/0000-00"
+          value={formatarCnpj(casoAtivo?.cnpj_cliente)}
+          disabled
+          className={estilos.campoInfoCaso}
+        />
+      </div>
+      {casoAtivo && !casoAtivo.cnpj_cliente && (
+        <p className={estilos.avisoCnpjAusente}>
+          Este caso ainda não tem CNPJ cadastrado. Edite o caso no seletor do topo para adicionar um antes de
+          enviar XMLs.
+        </p>
+      )}
 
       <form onSubmit={handleSubmitUpload}>
         <div
@@ -133,26 +173,30 @@ export function UploadXml() {
           <Card>
             <h2 className={estilos.tituloSecao}>Arquivos selecionados</h2>
             <div className={estilos.tabelaArquivos}>
-              {arquivos.map((arquivo, indice) => (
-                <div key={`${arquivo.name}-${indice}`} className={estilos.linhaArquivo}>
-                  <span className={estilos.nomeArquivo}>{arquivo.name}</span>
-                  <span className={estilos.tamanhoArquivo}>{formatarTamanho(arquivo.size)}</span>
-                  <button
-                    type="button"
-                    className={estilos.botaoRemover}
-                    onClick={() => removerArquivo(indice)}
-                    aria-label={`Remover ${arquivo.name}`}
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
+              {arquivos.slice(offsetArquivos, offsetArquivos + ITENS_POR_PAGINA).map((arquivo, indice) => {
+                const indiceReal = offsetArquivos + indice;
+                return (
+                  <div key={`${arquivo.name}-${indiceReal}`} className={estilos.linhaArquivo}>
+                    <span className={estilos.nomeArquivo}>{arquivo.name}</span>
+                    <span className={estilos.tamanhoArquivo}>{formatarTamanho(arquivo.size)}</span>
+                    <button
+                      type="button"
+                      className={estilos.botaoRemover}
+                      onClick={() => removerArquivo(indiceReal)}
+                      aria-label={`Remover ${arquivo.name}`}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                );
+              })}
             </div>
+            <Paginacao offset={offsetArquivos} limite={ITENS_POR_PAGINA} total={arquivos.length} onMudar={setOffsetArquivos} />
             <div className={estilos.rodapeArquivos}>
               <span className={estilos.contagemArquivos}>
                 {arquivos.length} arquivo(s) · {formatarTamanho(tamanhoTotal)}
               </span>
-              <Botao type="submit" disabled={upload.isPending}>
+              <Botao type="submit" disabled={upload.isPending || !casoAtivo?.cnpj_cliente}>
                 {upload.isPending ? "Enviando..." : "Enviar lote"}
               </Botao>
             </div>
@@ -163,24 +207,46 @@ export function UploadXml() {
       <Card>
         <h2 className={estilos.tituloSecao}>Progresso do lote</h2>
         {progresso.data ? (
-          <>
+          <div className={estilos.progresso}>
+            <div className={estilos.barraProgresso}>
+              <div
+                className={estilos.barraProgressoPreenchimento}
+                style={{
+                  width: `${progresso.data.total_arquivos > 0 ? (progresso.data.concluidos / progresso.data.total_arquivos) * 100 : 0}%`,
+                }}
+              />
+            </div>
             <p className={estilos.progressoResumo}>
-              {progresso.data.concluidos} de {progresso.data.total_arquivos} concluído(s) -- {progresso.data.com_erro} com
-              erro.
+              {progresso.data.concluidos} de {progresso.data.total_arquivos} concluídos · {progresso.data.com_erro}{" "}
+              com erro
             </p>
-            {/* Lista arquivo a arquivo com motivo_erro: é o que explica a falha de
-                parsing de um XML específico -- ele nunca chega a virar uma Nota
-                nesse caso, então o badge de status por nota não conta essa
-                história (ver frontend/paginas/dashboard.py:97-99). */}
-            <ul className={estilos.listaProgresso}>
-              {progresso.data.arquivos.map((arquivo) => (
-                <li key={arquivo.id}>
-                  <strong>{arquivo.nome_arquivo}</strong>: {arquivo.status}
-                  {arquivo.motivo_erro && <> -- {arquivo.motivo_erro}</>}
-                </li>
+            {/* Motivo do erro é o que explica a falha de parsing de um XML
+                específico -- ele nunca chega a virar uma Nota nesse caso,
+                então o badge de status por nota não conta essa história
+                (ver frontend/paginas/dashboard.py:97-99). */}
+            <div className={estilos.tabelaProgresso}>
+              <div className={estilos.cabecalhoTabelaProgresso}>
+                <span>ARQUIVO</span>
+                <span>STATUS</span>
+                <span>MOTIVO DO ERRO</span>
+              </div>
+              {progresso.data.arquivos.slice(offsetProgresso, offsetProgresso + ITENS_POR_PAGINA).map((arquivo) => (
+                <div key={arquivo.id} className={estilos.linhaProgresso}>
+                  <span className={estilos.nomeArquivoProgresso}>{arquivo.nome_arquivo}</span>
+                  <span>
+                    <Badge status={statusParaBadge(arquivo.status)} />
+                  </span>
+                  <span className={estilos.motivoErroProgresso}>{arquivo.motivo_erro}</span>
+                </div>
               ))}
-            </ul>
-          </>
+            </div>
+            <Paginacao
+              offset={offsetProgresso}
+              limite={ITENS_POR_PAGINA}
+              total={progresso.data.arquivos.length}
+              onMudar={setOffsetProgresso}
+            />
+          </div>
         ) : (
           <div className={estilos.estadoVazio}>
             <div className={estilos.estadoVazioIcone} />

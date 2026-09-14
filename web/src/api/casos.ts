@@ -1,4 +1,4 @@
-import { get, postJson } from "./cliente";
+import { get, patchJson, postJson } from "./cliente";
 import type { ClienteCaso } from "./tipos";
 
 export function listarCasos(): Promise<ClienteCaso[]> {
@@ -6,9 +6,24 @@ export function listarCasos(): Promise<ClienteCaso[]> {
   return get<ClienteCaso[]>("/api/casos");
 }
 
-export function criarCaso(nomeCliente: string, identificacaoCaso?: string): Promise<ClienteCaso> {
+export function criarCaso(
+  nomeCliente: string,
+  cnpjCliente: string,
+  identificacaoCaso?: string
+): Promise<ClienteCaso> {
   return postJson<ClienteCaso>("/api/casos", {
     nome_cliente: nomeCliente,
     identificacao_caso: identificacaoCaso || null,
+    cnpj_cliente: cnpjCliente,
   });
+}
+
+export interface DadosAtualizacaoCaso {
+  nome_cliente?: string;
+  identificacao_caso?: string | null;
+  cnpj_cliente?: string | null;
+}
+
+export function atualizarCaso(id: number, dados: DadosAtualizacaoCaso): Promise<ClienteCaso> {
+  return patchJson<ClienteCaso>(`/api/casos/${id}`, dados);
 }

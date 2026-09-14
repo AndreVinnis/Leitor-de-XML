@@ -27,6 +27,8 @@ export interface ClienteCaso {
   id: number;
   nome_cliente: string;
   identificacao_caso: string | null;
+  // Só dígitos, sem pontuação -- ver app/models/models.py::ClienteCaso.cnpj_cliente.
+  cnpj_cliente: string | null;
   criado_em: string;
 }
 
