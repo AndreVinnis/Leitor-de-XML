@@ -1,6 +1,17 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
+
+
+def _normalizar_cnpj_obrigatorio(valor: str | None) -> str:
+    """Usada tanto na criação quanto na edição de caso: CNPJ é obrigatório
+    nos dois fluxos, então mesmo em ClienteCasoUpdate (campos opcionais para
+    permitir atualização parcial) o valor, quando informado, nunca pode ser
+    vazio/nulo -- não existe "limpar o CNPJ" via PATCH."""
+    digitos = "".join(filter(str.isdigit, valor or ""))
+    if len(digitos) != 14:
+        raise ValueError("CNPJ do cliente é obrigatório e deve ter 14 dígitos.")
+    return digitos
 
 
 class ClienteCasoCreate(BaseModel):
@@ -8,6 +19,32 @@ class ClienteCasoCreate(BaseModel):
 
     nome_cliente: str
     identificacao_caso: str | None = None
+    cnpj_cliente: str
+
+    @field_validator("cnpj_cliente")
+    @classmethod
+    def validar_cnpj_cliente(cls, valor: str) -> str:
+        return _normalizar_cnpj_obrigatorio(valor)
+
+
+class ClienteCasoUpdate(BaseModel):
+    """Campos editáveis de um cliente/caso já existente. nome_cliente e
+    identificacao_caso são opcionais (permite atualização parcial), mas
+    cnpj_cliente -- quando enviado -- nunca pode ser vazio (ver
+    _normalizar_cnpj_obrigatorio). O default None aqui só existe para
+    permitir omitir o campo num PATCH que não mexe no CNPJ; o validator não
+    roda sobre esse default (Pydantic não valida valores default por
+    padrão), então omitir o campo não dispara o erro de obrigatoriedade.
+    """
+
+    nome_cliente: str | None = None
+    identificacao_caso: str | None = None
+    cnpj_cliente: str | None = None
+
+    @field_validator("cnpj_cliente")
+    @classmethod
+    def validar_cnpj_cliente(cls, valor: str | None) -> str:
+        return _normalizar_cnpj_obrigatorio(valor)
 
 
 class ClienteCasoRead(BaseModel):
@@ -16,4 +53,5 @@ class ClienteCasoRead(BaseModel):
     id: int
     nome_cliente: str
     identificacao_caso: str | None
+    cnpj_cliente: str | None
     criado_em: datetime

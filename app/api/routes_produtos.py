@@ -4,8 +4,9 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
-from app.ai.embeddings import gerar_embeddings
+from app.ai.embeddings import gerar_embeddings, serializar_embedding
 from app.core.auth import usuario_atual_ativo
+from app.core.config import settings
 from app.core.database import SessionLocal
 from app.models.models import (
     ItemNota,
@@ -261,7 +262,8 @@ async def criar_canonico(
         canonico = ProdutoCanonico(
             cliente_caso_id=cliente_caso_id, nome_canonico=nome_canonico, categoria=categoria
         )
-        canonico.embedding = gerar_embeddings([nome_canonico])[0]
+        canonico.embedding = serializar_embedding(gerar_embeddings([nome_canonico])[0])
+        canonico.embedding_modelo = settings.gemini_embedding_model
         db.add(canonico)
         db.flush()  # popula canonico.id antes do log e do retorno, sem commitar ainda
 

@@ -23,8 +23,19 @@
   margin: 0;
 }
 
-.campoCnpj {
+.linhaCamposCaso {
+  display: flex;
+  gap: var(--espaco-3);
+}
+
+.campoInfoCaso {
   max-width: 360px;
+}
+
+.avisoCnpjAusente {
+  margin: -12px 0 0 0;
+  font-size: 13px;
+  color: var(--cor-erro);
 }
 
 .dropArea {
@@ -136,18 +147,73 @@
   color: var(--cor-texto-secundario);
 }
 
-.listaProgresso {
-  margin: var(--espaco-3) 0 0 0;
-  padding-left: var(--espaco-4);
+.progresso {
   display: flex;
   flex-direction: column;
-  gap: var(--espaco-1);
+  gap: var(--espaco-3);
+}
+
+.barraProgresso {
+  height: 8px;
+  border-radius: var(--raio-pill);
+  background: var(--cor-borda);
+  overflow: hidden;
+}
+
+.barraProgressoPreenchimento {
+  height: 100%;
+  border-radius: var(--raio-pill);
+  background: var(--cor-primaria);
+  transition: width 0.3s ease;
 }
 
 .progressoResumo {
   margin: 0;
   color: var(--cor-texto-secundario);
   font-size: 13px;
+}
+
+.tabelaProgresso {
+  display: flex;
+  flex-direction: column;
+}
+
+.cabecalhoTabelaProgresso {
+  display: grid;
+  grid-template-columns: 1fr 140px 1fr;
+  gap: var(--espaco-3);
+  padding-bottom: var(--espaco-2);
+  border-bottom: 1px solid var(--cor-borda);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--cor-texto-secundario);
+}
+
+.linhaProgresso {
+  display: grid;
+  grid-template-columns: 1fr 140px 1fr;
+  align-items: center;
+  gap: var(--espaco-3);
+  padding: var(--espaco-3) 0;
+  border-bottom: 1px solid var(--cor-borda);
+}
+
+.linhaProgresso:last-child {
+  border-bottom: none;
+}
+
+.nomeArquivoProgresso {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--cor-texto);
+}
+
+.motivoErroProgresso {
+  font-size: 13px;
+  color: var(--cor-texto-secundario);
 }
 
 .estadoVazio {

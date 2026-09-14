@@ -55,10 +55,19 @@ def gerar_embeddings(textos: list[str], task_type: str = "RETRIEVAL_DOCUMENT") -
     return vetores
 
 
+def serializar_embedding(vetor: list[float]) -> bytes:
+    """Formato de armazenamento: float32 cru, sem cabeçalho (ver ProdutoCanonico.embedding)."""
+    return np.asarray(vetor, dtype=np.float32).tobytes()
+
+
+def desserializar_embedding(dado: bytes) -> np.ndarray:
+    return np.frombuffer(dado, dtype=np.float32)
+
+
 def selecionar_candidatos_similares(
     chaves_lote: list[str],
     embeddings_descricoes: dict[str, list[float]],
-    embeddings_canonicos: dict[int, list[float]],
+    embeddings_canonicos: dict[int, bytes],
     top_k: int,
     max_total: int,
 ) -> list[int]:
@@ -69,6 +78,11 @@ def selecionar_candidatos_similares(
     cada descrição, capada em `max_total` ids -- é essa lista de ids que
     substitui o catálogo completo no prompt da IA generativa.
 
+    `embeddings_canonicos` traz os vetores já serializados (bytes float32,
+    ver `serializar_embedding`) e só deve conter canônicos cujo
+    `embedding_modelo` bate com o modelo configurado atualmente -- é
+    responsabilidade do chamador filtrar isso antes de chamar esta função.
+
     Retorna lista vazia se não houver nenhum canônico com embedding ainda
     (ex: catálogo grande mas backfill de embeddings não rodou).
     """
@@ -76,7 +90,7 @@ def selecionar_candidatos_similares(
         return []
 
     ids_matriz = list(embeddings_canonicos.keys())
-    matriz = np.array([embeddings_canonicos[cid] for cid in ids_matriz])
+    matriz = np.array([desserializar_embedding(embeddings_canonicos[cid]) for cid in ids_matriz])
     normas = np.linalg.norm(matriz, axis=1)
     normas[normas == 0] = 1
 

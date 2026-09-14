@@ -16,10 +16,15 @@ export function Paginacao({ offset, limite, total, onMudar }: PaginacaoProps) {
 
   return (
     <div className={estilos.paginacao}>
-      <Botao variante="secundario" disabled={!temAnterior} onClick={() => onMudar(Math.max(0, offset - limite))}>
+      <Botao
+        type="button"
+        variante="secundario"
+        disabled={!temAnterior}
+        onClick={() => onMudar(Math.max(0, offset - limite))}
+      >
         Página anterior
       </Botao>
-      <Botao variante="secundario" disabled={!temProxima} onClick={() => onMudar(offset + limite)}>
+      <Botao type="button" variante="secundario" disabled={!temProxima} onClick={() => onMudar(offset + limite)}>
         Próxima página
       </Botao>
     </div>

@@ -1,4 +1,4 @@
-from app.models.models import RoleUsuario, StatusCadastro, Usuario
+from app.models.models import ClienteCaso, RoleUsuario, StatusCadastro, Usuario
 
 
 def _criar_usuario(session, email="adv@x.com"):
@@ -16,6 +16,17 @@ def _criar_usuario(session, email="adv@x.com"):
     return usuario
 
 
+def _criar_caso_legado_sem_cnpj(session, nome="Caso Legado"):
+    """Simula um caso criado antes de cnpj_cliente existir/virar obrigatório
+    -- hoje só é possível chegar nesse estado via dado pré-existente no
+    banco, não mais pela API (POST /api/casos exige cnpj_cliente)."""
+    caso = ClienteCaso(nome_cliente=nome)
+    session.add(caso)
+    session.commit()
+    session.refresh(caso)
+    return caso
+
+
 def test_criar_e_listar_caso(client, db_session_factory, logar_usuario):
     session = db_session_factory()
     usuario = _criar_usuario(session)
@@ -23,12 +34,18 @@ def test_criar_e_listar_caso(client, db_session_factory, logar_usuario):
     logar_usuario(usuario)
 
     resp_criar = client.post(
-        "/api/casos", json={"nome_cliente": "Cliente A", "identificacao_caso": "Processo 123"}
+        "/api/casos",
+        json={
+            "nome_cliente": "Cliente A",
+            "identificacao_caso": "Processo 123",
+            "cnpj_cliente": "98765432000188",
+        },
     )
     assert resp_criar.status_code == 200
     corpo = resp_criar.json()
     assert corpo["nome_cliente"] == "Cliente A"
     assert corpo["identificacao_caso"] == "Processo 123"
+    assert corpo["cnpj_cliente"] == "98765432000188"
     caso_id = corpo["id"]
 
     resp_lista = client.get("/api/casos")
@@ -46,9 +63,99 @@ def test_criar_caso_sem_identificacao_e_opcional(client, db_session_factory, log
     session.close()
     logar_usuario(usuario)
 
-    resp = client.post("/api/casos", json={"nome_cliente": "Cliente B"})
+    resp = client.post(
+        "/api/casos", json={"nome_cliente": "Cliente B", "cnpj_cliente": "98765432000188"}
+    )
     assert resp.status_code == 200
     assert resp.json()["identificacao_caso"] is None
+
+
+def test_criar_caso_com_cnpj_normaliza_pontuacao(client, db_session_factory, logar_usuario):
+    session = db_session_factory()
+    usuario = _criar_usuario(session, "adv4@x.com")
+    session.close()
+    logar_usuario(usuario)
+
+    resp = client.post(
+        "/api/casos",
+        json={"nome_cliente": "Cliente D", "cnpj_cliente": "98.765.432/0001-88"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["cnpj_cliente"] == "98765432000188"
+
+
+def test_criar_caso_com_cnpj_invalido_retorna_422(client, db_session_factory, logar_usuario):
+    session = db_session_factory()
+    usuario = _criar_usuario(session, "adv5@x.com")
+    session.close()
+    logar_usuario(usuario)
+
+    resp = client.post("/api/casos", json={"nome_cliente": "Cliente E", "cnpj_cliente": "123"})
+    assert resp.status_code == 422
+
+
+def test_criar_caso_sem_cnpj_retorna_422(client, db_session_factory, logar_usuario):
+    session = db_session_factory()
+    usuario = _criar_usuario(session, "adv8@x.com")
+    session.close()
+    logar_usuario(usuario)
+
+    resp = client.post("/api/casos", json={"nome_cliente": "Cliente G"})
+    assert resp.status_code == 422
+
+
+def test_atualizar_caso_preenche_cnpj_de_caso_legado(client, db_session_factory, logar_usuario):
+    session = db_session_factory()
+    usuario = _criar_usuario(session, "adv6@x.com")
+    caso = _criar_caso_legado_sem_cnpj(session, "Cliente F")
+    caso_id = caso.id
+    session.close()
+    logar_usuario(usuario)
+
+    resp = client.patch(f"/api/casos/{caso_id}", json={"cnpj_cliente": "98765432000188"})
+    assert resp.status_code == 200
+    assert resp.json()["cnpj_cliente"] == "98765432000188"
+    assert resp.json()["nome_cliente"] == "Cliente F"  # campo não enviado permanece igual
+
+
+def test_atualizar_caso_sem_mexer_no_cnpj_nao_altera(client, db_session_factory, logar_usuario):
+    session = db_session_factory()
+    usuario = _criar_usuario(session, "adv9@x.com")
+    session.close()
+    logar_usuario(usuario)
+
+    caso_id = client.post(
+        "/api/casos", json={"nome_cliente": "Cliente H", "cnpj_cliente": "98765432000188"}
+    ).json()["id"]
+
+    resp = client.patch(f"/api/casos/{caso_id}", json={"nome_cliente": "Cliente H Editado"})
+    assert resp.status_code == 200
+    assert resp.json()["nome_cliente"] == "Cliente H Editado"
+    assert resp.json()["cnpj_cliente"] == "98765432000188"  # não foi tocado, permanece
+
+
+def test_atualizar_caso_nao_permite_remover_cnpj(client, db_session_factory, logar_usuario):
+    session = db_session_factory()
+    usuario = _criar_usuario(session, "adv10@x.com")
+    session.close()
+    logar_usuario(usuario)
+
+    caso_id = client.post(
+        "/api/casos", json={"nome_cliente": "Cliente I", "cnpj_cliente": "98765432000188"}
+    ).json()["id"]
+
+    resp = client.patch(f"/api/casos/{caso_id}", json={"cnpj_cliente": None})
+    assert resp.status_code == 422
+
+
+def test_atualizar_caso_inexistente_retorna_404(client, db_session_factory, logar_usuario):
+    session = db_session_factory()
+    usuario = _criar_usuario(session, "adv7@x.com")
+    session.close()
+    logar_usuario(usuario)
+
+    resp = client.patch("/api/casos/999999", json={"cnpj_cliente": "98765432000188"})
+    assert resp.status_code == 404
 
 
 def test_obter_caso_inexistente_retorna_404(client, db_session_factory, logar_usuario):
@@ -69,5 +176,7 @@ def test_listar_casos_sem_autenticacao_retorna_401(client, db_session_factory):
 
 def test_criar_caso_sem_autenticacao_retorna_401(client, db_session_factory):
     db_session_factory()
-    resp = client.post("/api/casos", json={"nome_cliente": "Cliente C"})
+    resp = client.post(
+        "/api/casos", json={"nome_cliente": "Cliente C", "cnpj_cliente": "98765432000188"}
+    )
     assert resp.status_code == 401

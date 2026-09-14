@@ -123,14 +123,8 @@
 .itemCaso {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--espaco-2);
-  padding: 10px 14px;
-  border: none;
+  gap: 2px;
   border-radius: var(--raio-borda);
-  background: none;
-  cursor: pointer;
-  text-align: left;
   width: 100%;
 }
 
@@ -141,6 +135,39 @@
 .itemCasoAtivo,
 .itemCasoAtivo:hover {
   background: var(--cor-accent-fundo);
+}
+
+.itemCasoBotao {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-2);
+  padding: 10px 14px;
+  border: none;
+  border-radius: var(--raio-borda);
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  flex: 1 0 0;
+  min-width: 0;
+}
+
+.itemCasoEditar {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  margin-right: 6px;
+  border: none;
+  border-radius: var(--raio-borda);
+  background: none;
+  color: var(--cor-texto-secundario);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.itemCasoEditar:hover {
+  background: var(--cor-superficie);
+  color: var(--cor-primaria);
 }
 
 .itemCasoTextos {

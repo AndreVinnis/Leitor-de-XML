@@ -110,3 +110,11 @@ export function postJson<T>(caminho: string, corpo: unknown, opcoes?: OpcoesRequ
     body: JSON.stringify(corpo),
   });
 }
+
+export function patchJson<T>(caminho: string, corpo: unknown, opcoes?: OpcoesRequisicao) {
+  return patch<T>(caminho, {
+    ...opcoes,
+    headers: { "Content-Type": "application/json", ...opcoes?.headers },
+    body: JSON.stringify(corpo),
+  });
+}

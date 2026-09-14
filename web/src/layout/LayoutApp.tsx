@@ -3,7 +3,8 @@ import { Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../auth/ContextoAuth";
 import { useCasos } from "../casos/ContextoCaso";
-import { criarCaso } from "../api/casos";
+import { atualizarCaso, criarCaso } from "../api/casos";
+import type { ClienteCaso } from "../api/tipos";
 import { useToast } from "../componentes/Toast";
 import { Botao } from "../componentes/Botao";
 import { CampoTexto } from "../componentes/CampoTexto";
@@ -33,7 +34,14 @@ export function LayoutApp() {
   const [modalNovoCasoAberto, setModalNovoCasoAberto] = useState(false);
   const [nomeNovoCaso, setNomeNovoCaso] = useState("");
   const [identificacaoNovoCaso, setIdentificacaoNovoCaso] = useState("");
+  const [cnpjNovoCaso, setCnpjNovoCaso] = useState("");
   const [salvandoCaso, setSalvandoCaso] = useState(false);
+
+  const [casoEmEdicao, setCasoEmEdicao] = useState<ClienteCaso | null>(null);
+  const [nomeCasoEditado, setNomeCasoEditado] = useState("");
+  const [identificacaoCasoEditado, setIdentificacaoCasoEditado] = useState("");
+  const [cnpjCasoEditado, setCnpjCasoEditado] = useState("");
+  const [salvandoEdicaoCaso, setSalvandoEdicaoCaso] = useState(false);
 
   const seletorRef = useRef<HTMLDivElement>(null);
 
@@ -67,15 +75,20 @@ export function LayoutApp() {
     setSeletorAberto(false);
     setNomeNovoCaso("");
     setIdentificacaoNovoCaso("");
+    setCnpjNovoCaso("");
     setModalNovoCasoAberto(true);
   }
 
   async function handleCriarCaso(evento: FormEvent) {
     evento.preventDefault();
-    if (!nomeNovoCaso.trim()) return;
+    if (!nomeNovoCaso.trim() || !cnpjNovoCaso.trim()) return;
     setSalvandoCaso(true);
     try {
-      const caso = await criarCaso(nomeNovoCaso.trim(), identificacaoNovoCaso.trim() || undefined);
+      const caso = await criarCaso(
+        nomeNovoCaso.trim(),
+        cnpjNovoCaso.trim(),
+        identificacaoNovoCaso.trim() || undefined
+      );
       await queryClient.invalidateQueries({ queryKey: ["casos"] });
       setModalNovoCasoAberto(false);
       navigate(`/casos/${caso.id}/dashboard`);
@@ -83,6 +96,33 @@ export function LayoutApp() {
       notificar(excecao instanceof ErroApi ? excecao.message : "Não foi possível criar o caso.", "erro");
     } finally {
       setSalvandoCaso(false);
+    }
+  }
+
+  function abrirModalEditarCaso(caso: ClienteCaso) {
+    setSeletorAberto(false);
+    setCasoEmEdicao(caso);
+    setNomeCasoEditado(caso.nome_cliente);
+    setIdentificacaoCasoEditado(caso.identificacao_caso ?? "");
+    setCnpjCasoEditado(caso.cnpj_cliente ?? "");
+  }
+
+  async function handleAtualizarCaso(evento: FormEvent) {
+    evento.preventDefault();
+    if (!casoEmEdicao || !nomeCasoEditado.trim() || !cnpjCasoEditado.trim()) return;
+    setSalvandoEdicaoCaso(true);
+    try {
+      await atualizarCaso(casoEmEdicao.id, {
+        nome_cliente: nomeCasoEditado.trim(),
+        identificacao_caso: identificacaoCasoEditado.trim() || null,
+        cnpj_cliente: cnpjCasoEditado.trim(),
+      });
+      await queryClient.invalidateQueries({ queryKey: ["casos"] });
+      setCasoEmEdicao(null);
+    } catch (excecao) {
+      notificar(excecao instanceof ErroApi ? excecao.message : "Não foi possível atualizar o caso.", "erro");
+    } finally {
+      setSalvandoEdicaoCaso(false);
     }
   }
 
@@ -107,7 +147,7 @@ export function LayoutApp() {
               onClick={() => setSeletorAberto((atual) => !atual)}
             >
               <span className={estilos.pilulaTextos}>
-                <span className={estilos.pilulaRotulo}>Cliente / caso</span>
+                <span className={estilos.pilulaRotulo}>Cliente / Caso</span>
                 <span className={estilos.pilulaValor}>
                   {carregando
                     ? "Carregando..."
@@ -144,20 +184,25 @@ export function LayoutApp() {
                   casosFiltrados.map((caso) => {
                     const ativo = String(caso.id) === casoId;
                     return (
-                      <button
-                        key={caso.id}
-                        type="button"
-                        className={`${estilos.itemCaso} ${ativo ? estilos.itemCasoAtivo : ""}`}
-                        onClick={() => selecionarCaso(caso.id)}
-                      >
-                        <span className={estilos.itemCasoTextos}>
-                          <span className={estilos.itemCasoNome}>{caso.nome_cliente}</span>
-                          {caso.identificacao_caso && (
-                            <span className={estilos.itemCasoIdentificacao}>{caso.identificacao_caso}</span>
-                          )}
-                        </span>
-                        {ativo && <span className={estilos.itemCasoCheck}>✓</span>}
-                      </button>
+                      <div key={caso.id} className={`${estilos.itemCaso} ${ativo ? estilos.itemCasoAtivo : ""}`}>
+                        <button type="button" className={estilos.itemCasoBotao} onClick={() => selecionarCaso(caso.id)}>
+                          <span className={estilos.itemCasoTextos}>
+                            <span className={estilos.itemCasoNome}>{caso.nome_cliente}</span>
+                            {caso.identificacao_caso && (
+                              <span className={estilos.itemCasoIdentificacao}>{caso.identificacao_caso}</span>
+                            )}
+                          </span>
+                          {ativo && <span className={estilos.itemCasoCheck}>✓</span>}
+                        </button>
+                        <button
+                          type="button"
+                          className={estilos.itemCasoEditar}
+                          onClick={() => abrirModalEditarCaso(caso)}
+                          aria-label={`Editar ${caso.nome_cliente}`}
+                        >
+                          ✎
+                        </button>
+                      </div>
                     );
                   })
                 )}
@@ -266,12 +311,53 @@ export function LayoutApp() {
             value={identificacaoNovoCaso}
             onChange={(evento) => setIdentificacaoNovoCaso(evento.target.value)}
           />
+          <CampoTexto
+            rotulo="CNPJ do cliente (obrigatório)"
+            placeholder="00.000.000/0000-00"
+            value={cnpjNovoCaso}
+            onChange={(evento) => setCnpjNovoCaso(evento.target.value)}
+            required
+          />
           <div className={estilos.acoesModalNovoCaso}>
             <Botao type="button" variante="secundario" onClick={() => setModalNovoCasoAberto(false)}>
               Cancelar
             </Botao>
             <Botao type="submit" disabled={salvandoCaso}>
               {salvandoCaso ? "Criando..." : "Criar caso"}
+            </Botao>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal aberto={casoEmEdicao !== null} onFechar={() => setCasoEmEdicao(null)} titulo="Editar caso">
+        <form onSubmit={handleAtualizarCaso} className={estilos.formNovoCaso}>
+          <CampoTexto
+            rotulo="Nome do cliente (obrigatório)"
+            placeholder="Digite o nome do cliente"
+            autoFocus
+            value={nomeCasoEditado}
+            onChange={(evento) => setNomeCasoEditado(evento.target.value)}
+            required
+          />
+          <CampoTexto
+            rotulo="Identificação do caso (opcional)"
+            placeholder="Ex.: Proc. 1234"
+            value={identificacaoCasoEditado}
+            onChange={(evento) => setIdentificacaoCasoEditado(evento.target.value)}
+          />
+          <CampoTexto
+            rotulo="CNPJ do cliente (obrigatório)"
+            placeholder="00.000.000/0000-00"
+            value={cnpjCasoEditado}
+            onChange={(evento) => setCnpjCasoEditado(evento.target.value)}
+            required
+          />
+          <div className={estilos.acoesModalNovoCaso}>
+            <Botao type="button" variante="secundario" onClick={() => setCasoEmEdicao(null)}>
+              Cancelar
+            </Botao>
+            <Botao type="submit" disabled={salvandoEdicaoCaso}>
+              {salvandoEdicaoCaso ? "Salvando..." : "Salvar"}
             </Botao>
           </div>
         </form>

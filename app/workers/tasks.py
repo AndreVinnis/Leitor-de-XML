@@ -1,4 +1,4 @@
-from app.ai.embeddings import gerar_embeddings, selecionar_candidatos_similares
+from app.ai.embeddings import gerar_embeddings, selecionar_candidatos_similares, serializar_embedding
 from app.ai.normalizador_produtos import sugerir_normalizacao
 from app.core.config import settings
 from app.core.database import SessionLocal
@@ -294,7 +294,15 @@ def normalizar_produtos_pendentes(cliente_caso_id: int) -> dict:
         ]
         canonicos_por_id = {c["id"]: c for c in canonicos_existentes}
         ids_canonicos_existentes = {c["id"] for c in canonicos_existentes}
-        embeddings_canonicos = {c.id: c.embedding for c in canonicos_orm if c.embedding}
+        # Só entram no pré-filtro canônicos com embedding do modelo
+        # atualmente configurado -- um embedding de modelo antigo é tratado
+        # como inexistente, nunca comparado por cosseno contra um vetor de
+        # espaço diferente (ver app/models/models.py::ProdutoCanonico.embedding_modelo).
+        embeddings_canonicos = {
+            c.id: c.embedding
+            for c in canonicos_orm
+            if c.embedding and c.embedding_modelo == settings.gemini_embedding_model
+        }
 
         chaves = list(grupos.keys())
         sugestoes_criadas = 0
@@ -351,7 +359,8 @@ def normalizar_produtos_pendentes(cliente_caso_id: int) -> dict:
                         nome_canonico=resultado.novo_produto_canonico.nome_canonico,
                         categoria=resultado.novo_produto_canonico.categoria,
                     )
-                    novo.embedding = gerar_embeddings([novo.nome_canonico])[0]
+                    novo.embedding = serializar_embedding(gerar_embeddings([novo.nome_canonico])[0])
+                    novo.embedding_modelo = settings.gemini_embedding_model
                     db.add(novo)
                     db.flush()  # garante novo.id
                     produto_canonico_id = novo.id
