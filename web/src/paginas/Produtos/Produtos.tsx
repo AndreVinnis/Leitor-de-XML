@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   confirmarSugestao,
   confirmarSugestoesLote,
   corrigirSugestao,
   criarCanonico,
+  dispararNormalizacao,
   editarCanonico,
   listarCanonicos,
   listarSugestoes,
   rejeitarSugestao,
   rejeitarSugestoesLote,
+  statusNormalizacao,
 } from "../../api/produtos";
 import { ErroApi } from "../../api/cliente";
 import type { ProdutoCanonico, ResultadoRevisao, StatusRevisao, SugestaoNormalizacao } from "../../api/tipos";
@@ -51,14 +53,71 @@ const LIMITE_CANONICOS = 10;
 
 export function Produtos() {
   const [aba, setAba] = useState<Aba>("sugestoes");
+  const { casoId } = useParams<{ casoId: string }>();
+  const casoIdNumero = Number(casoId);
+  const queryClient = useQueryClient();
+  const { notificar } = useToast();
+  const [taskId, setTaskId] = useState<string | null>(null);
+
+  const normalizar = useMutation({
+    mutationFn: () => dispararNormalizacao(casoIdNumero),
+    onSuccess: (resposta) => {
+      setTaskId(resposta.task_id);
+      notificar("Normalização disparada em segundo plano.");
+    },
+    onError: (erro) => {
+      notificar(erro instanceof ErroApi ? erro.message : "Erro ao disparar normalização.", "erro");
+    },
+  });
+
+  const statusTask = useQuery({
+    queryKey: ["normalizacao-status", taskId],
+    queryFn: () => statusNormalizacao(taskId as string),
+    enabled: taskId !== null,
+    // Reconsulta sozinho enquanto a task não terminar (mesmo padrão do
+    // progresso de upload em UploadXml.tsx).
+    refetchInterval: (query) => {
+      const dados = query.state.data;
+      if (!dados || (dados.status !== "SUCCESS" && dados.status !== "FAILURE")) return 1500;
+      return false;
+    },
+  });
+
+  useEffect(() => {
+    const dados = statusTask.data;
+    if (!dados || (dados.status !== "SUCCESS" && dados.status !== "FAILURE")) return;
+
+    if (dados.status === "FAILURE" || dados.resultado?.status === "erro_inesperado") {
+      notificar(`Falha na normalização: ${dados.resultado?.motivo ?? "motivo desconhecido"}`, "erro");
+    } else {
+      const sugestoesCriadas = dados.resultado?.sugestoes_criadas ?? 0;
+      notificar(
+        sugestoesCriadas > 0
+          ? `Normalização concluída: ${sugestoesCriadas} sugestão(ões) criada(s) para revisão.`
+          : "Normalização concluída: nenhum item pendente encontrado."
+      );
+    }
+
+    queryClient.invalidateQueries({ queryKey: ["sugestoes", casoIdNumero] });
+    queryClient.invalidateQueries({ queryKey: ["canonicos-todos", casoIdNumero] });
+    queryClient.invalidateQueries({ queryKey: ["canonicos-tabela", casoIdNumero] });
+    setTaskId(null);
+  }, [statusTask.data, queryClient, casoIdNumero, notificar]);
+
+  const normalizando = normalizar.isPending || (taskId !== null && statusTask.data?.status !== "SUCCESS" && statusTask.data?.status !== "FAILURE");
 
   return (
     <div className={estilos.pagina}>
       <div className={estilos.cabecalho}>
-        <h1 className={estilos.titulo}>Normalização de Produtos</h1>
-        <p className={estilos.subtitulo}>
-          Revise as sugestões geradas pela IA a partir das notas fiscais importadas
-        </p>
+        <div className={estilos.cabecalhoTextos}>
+          <h1 className={estilos.titulo}>Normalização de Produtos</h1>
+          <p className={estilos.subtitulo}>
+            Revise as sugestões geradas pela IA a partir das notas fiscais importadas
+          </p>
+        </div>
+        <Botao onClick={() => normalizar.mutate()} disabled={normalizando}>
+          {normalizando ? "Normalizando..." : "Normalizar produtos pendentes"}
+        </Botao>
       </div>
 
       <div className={estilos.tabs}>
@@ -151,6 +210,15 @@ function AbaSugestoes() {
       else novo.add(id);
       return novo;
     });
+  }
+
+  const idsPendentesPagina = useMemo(
+    () => (sugestoes.data?.itens ?? []).filter((s) => s.status === "pendente").map((s) => s.id),
+    [sugestoes.data]
+  );
+
+  function selecionarTodos() {
+    setSelecionados(new Set(idsPendentesPagina));
   }
 
   async function invalidarSugestoes() {
@@ -340,6 +408,13 @@ function AbaSugestoes() {
 
       <div className={estilos.barraLote}>
         <span className={estilos.contadorSelecionados}>{selecionados.size} selecionado(s)</span>
+        <Botao
+          variante="secundario"
+          disabled={idsPendentesPagina.length === 0}
+          onClick={selecionarTodos}
+        >
+          Selecionar todos
+        </Botao>
         <Botao variante="secundario" disabled={selecionados.size === 0} onClick={() => executarLote("rejeitar")}>
           Rejeitar selecionados
         </Botao>

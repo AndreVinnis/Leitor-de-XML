@@ -1,14 +1,24 @@
 import { get, patch, postJson } from "./cliente";
 import type {
+  DisparoNormalizacao,
   ListaCanonicos,
   ListaItensVinculados,
   ListaSugestoes,
   ProdutoCanonico,
   ResultadoRevisao,
   ResultadoRevisaoLote,
+  StatusNormalizacao,
   StatusRevisao,
   TipoNota,
 } from "./tipos";
+
+export function dispararNormalizacao(clienteCasoId: number): Promise<DisparoNormalizacao> {
+  return postJson<DisparoNormalizacao>("/api/produtos/normalizar", { cliente_caso_id: clienteCasoId });
+}
+
+export function statusNormalizacao(taskId: string): Promise<StatusNormalizacao> {
+  return get<StatusNormalizacao>(`/api/produtos/normalizar/${taskId}/status`);
+}
 
 interface ParametrosListarSugestoes {
   clienteCasoId: number;

@@ -6,6 +6,14 @@
 
 .cabecalho {
   display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--espaco-3);
+  flex-wrap: wrap;
+}
+
+.cabecalhoTextos {
+  display: flex;
   flex-direction: column;
   gap: 4px;
 }
