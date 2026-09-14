@@ -173,6 +173,11 @@ class ClienteCaso(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     nome_cliente = Column(String(255), nullable=False)
     identificacao_caso = Column(String(120), nullable=True)
+    # Só dígitos, sem pontuação -- mesmo formato que
+    # app/parsers/nfe_parser.py::classificar_tipo já normaliza antes de
+    # comparar. Nullable porque casos criados antes deste campo não têm
+    # CNPJ ainda; upload de XML fica bloqueado até o caso ser editado com um.
+    cnpj_cliente = Column(String(14), nullable=True)
     criado_em = Column(DateTime, default=datetime.utcnow)
 
 
