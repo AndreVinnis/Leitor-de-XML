@@ -23,6 +23,7 @@ import { Card } from "../../componentes/Card";
 import { Modal } from "../../componentes/Modal";
 import { Paginacao } from "../../componentes/Paginacao";
 import { SeletorCategoria } from "../../componentes/SeletorCategoria";
+import { Spinner } from "../../componentes/Spinner";
 import { Tabela, type ColunaTabela } from "../../componentes/Tabela";
 import { useToast } from "../../componentes/Toast";
 import estilos from "./Produtos.module.css";
@@ -119,6 +120,13 @@ export function Produtos() {
           {normalizando ? "Normalizando..." : "Normalizar produtos pendentes"}
         </Botao>
       </div>
+
+      {normalizando && (
+        <div className={estilos.avisoNormalizando}>
+          <Spinner tamanho={16} />
+          <span>Carregando, isso pode demorar um pouco.</span>
+        </div>
+      )}
 
       <div className={estilos.tabs}>
         <button
