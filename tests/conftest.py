@@ -30,6 +30,25 @@ def _sem_broker_de_verdade(monkeypatch):
     )
 
 
+@pytest.fixture(autouse=True)
+def _sem_embedding_de_verdade(monkeypatch):
+    """
+    Mesmo racional do fixture de broker acima, mas para a API de embedding
+    do Gemini: app.workers.tasks (ao criar um ProdutoCanonico sugerido pela
+    IA) e app.api.routes_produtos::criar_canonico chamam gerar_embeddings de
+    verdade -- sem API key/rede em CI, isso quebraria qualquer teste que
+    crie um produto canônico. Devolve um vetor fixo (não-nulo) por texto de
+    entrada; testes que precisam controlar o vetor/a similaridade sobrescrevem
+    este mock localmente.
+    """
+    mock_embeddings = MagicMock(
+        side_effect=lambda textos, *args, **kwargs: [[0.1, 0.2, 0.3] for _ in textos]
+    )
+    monkeypatch.setattr("app.workers.tasks.gerar_embeddings", mock_embeddings)
+    monkeypatch.setattr("app.api.routes_produtos.gerar_embeddings", mock_embeddings)
+    monkeypatch.setattr("app.scripts.backfill_embeddings.gerar_embeddings", mock_embeddings)
+
+
 @pytest.fixture
 def db_session_factory(monkeypatch):
     """
@@ -62,6 +81,7 @@ def db_session_factory(monkeypatch):
     monkeypatch.setattr("app.api.routes_dashboard.SessionLocal", TestSessionLocal)
     monkeypatch.setattr("app.api.routes_consulta.SessionLocal", TestSessionLocal)
     monkeypatch.setattr("app.api.routes_usuarios.SessionLocal", TestSessionLocal)
+    monkeypatch.setattr("app.scripts.backfill_embeddings.SessionLocal", TestSessionLocal)
 
     yield TestSessionLocal
 

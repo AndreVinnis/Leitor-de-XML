@@ -95,10 +95,13 @@ camada de NL→SQL ainda precisam ser implementados.
 
 ## O que falta (ver "Próximos passos" nas Instruções do Projeto)
 
-1. **Embeddings/busca por similaridade**: decidir entre MySQL 9 (vetor
-   nativo), banco vetorial dedicado (Qdrant/Milvus/Chroma) ou similaridade
-   calculada em Python contra embeddings salvos como JSON (já há uma
-   coluna `embedding` JSON em `produtos_canonicos` como placeholder).
+1. ~~Embeddings/busca por similaridade~~ — **implementado**: pré-filtro por
+   embedding (Gemini) + similaridade de cosseno calculada em Python/numpy
+   sobre a coluna `embedding` (JSON) de `produtos_canonicos`, usado só
+   quando o catálogo de canônicos do caso é grande demais para caber
+   inteiro no prompt (ver `app/ai/embeddings.py` e
+   `app/workers/tasks.py::normalizar_produtos_pendentes`). Sem MySQL 9 e
+   sem banco vetorial dedicado.
 2. **Motor de reconciliação**: lógica pura que cruza entradas x saídas
    por `produto_canonico_id`, calcula saldo e gera `AchadoReconciliacao`.
    Ainda não implementado.

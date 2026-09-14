@@ -149,6 +149,30 @@ export interface ListaCanonicos {
   total: number;
 }
 
+export interface DisparoNormalizacao {
+  status: string;
+  task_id: string;
+}
+
+// app/workers/tasks.py::normalizar_produtos_pendentes -- "erro_inesperado"
+// só acontece se uma exceção escapar da task (bug), não é um caminho normal.
+export interface ResultadoNormalizacao {
+  status: "ok" | "erro_inesperado";
+  descricoes_unicas?: number;
+  itens_pendentes?: number;
+  produtos_canonicos_criados?: number;
+  sugestoes_criadas?: number;
+  motivo?: string;
+}
+
+// result.status de um AsyncResult do Celery (PENDING/STARTED/SUCCESS/FAILURE/...) --
+// resultado só vem preenchido quando a task termina (result.ready()).
+export interface StatusNormalizacao {
+  task_id: string;
+  status: string;
+  resultado: ResultadoNormalizacao | null;
+}
+
 // As rotas de revisão (confirmar/rejeitar/corrigir, unitárias e em lote)
 // devolvem sempre HTTP 200 -- o campo "status" do corpo é que diz se deu
 // certo. Ver comentário de app/api/routes_produtos.py::_revisar.
