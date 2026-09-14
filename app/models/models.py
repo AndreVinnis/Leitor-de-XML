@@ -3,12 +3,12 @@ from enum import Enum
 
 from fastapi_users.db import SQLAlchemyBaseUserTable
 from sqlalchemy import (
-    JSON,
     Column,
     DateTime,
     Enum as SAEnum,
     ForeignKey,
     Integer,
+    LargeBinary,
     Numeric,
     String,
     Text,
@@ -93,9 +93,17 @@ class ProdutoCanonico(Base):
     cliente_caso_id = Column(Integer, ForeignKey("clientes_casos.id"), nullable=False, index=True)
     nome_canonico = Column(String(255), nullable=False, index=True)
     categoria = Column(String(120), nullable=True, index=True)
-    # Embeddings: decisão em aberto (JSON aqui é um placeholder simples;
-    # ver observação do projeto sobre MySQL x pgvector x banco vetorial dedicado)
-    embedding = Column(JSON, nullable=True)
+    # Vetor de embedding serializado como float32 (numpy .tobytes(); ler de
+    # volta com numpy.frombuffer(embedding, dtype=np.float32) -- ver
+    # app/ai/embeddings.py::serializar_embedding/desserializar_embedding).
+    embedding = Column(LargeBinary, nullable=True)
+    # Identificador do modelo Gemini que gerou `embedding` (ex:
+    # "gemini-embedding-001"). Necessário para nunca comparar por cosseno
+    # vetores gerados por modelos diferentes: ao trocar
+    # settings.gemini_embedding_model, embeddings com embedding_modelo
+    # antigo são ignorados pelo pré-filtro até serem regerados (ver
+    # app/scripts/backfill_embeddings.py).
+    embedding_modelo = Column(String(120), nullable=True)
     criado_em = Column(DateTime, default=datetime.utcnow)
 
     cliente_caso = relationship("ClienteCaso")

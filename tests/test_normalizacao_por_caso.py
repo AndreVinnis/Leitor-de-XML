@@ -1,6 +1,8 @@
 from unittest.mock import patch
 
+from app.ai.embeddings import serializar_embedding
 from app.ai.normalizador_produtos import SugestaoIA
+from app.core.config import settings
 from app.models.models import ClienteCaso, ItemNota, Nota, ProdutoCanonico, TipoNota
 from app.workers.tasks import (
     LIMIAR_FILTRO_EMBEDDING,
@@ -153,7 +155,8 @@ def test_catalogo_grande_usa_prefiltro_de_embedding(mock_sugerir, mock_embedding
             ProdutoCanonico(
                 cliente_caso_id=caso.id,
                 nome_canonico=f"Produto {i}",
-                embedding=vetor,
+                embedding=serializar_embedding(vetor),
+                embedding_modelo=settings.gemini_embedding_model,
             )
         )
     session.commit()
