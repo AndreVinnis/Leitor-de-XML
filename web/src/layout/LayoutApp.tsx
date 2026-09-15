@@ -107,15 +107,22 @@ export function LayoutApp() {
     setCnpjCasoEditado(caso.cnpj_cliente ?? "");
   }
 
+  // CNPJ nunca pode ser alterado depois de definido (o backend rejeita com
+  // 422) -- só é editável aqui enquanto o caso ainda não tiver um, para
+  // permitir destravar upload em casos legados criados antes desse campo
+  // existir.
+  const cnpjJaDefinido = casoEmEdicao?.cnpj_cliente != null;
+
   async function handleAtualizarCaso(evento: FormEvent) {
     evento.preventDefault();
-    if (!casoEmEdicao || !nomeCasoEditado.trim() || !cnpjCasoEditado.trim()) return;
+    if (!casoEmEdicao || !nomeCasoEditado.trim()) return;
+    if (!cnpjJaDefinido && !cnpjCasoEditado.trim()) return;
     setSalvandoEdicaoCaso(true);
     try {
       await atualizarCaso(casoEmEdicao.id, {
         nome_cliente: nomeCasoEditado.trim(),
         identificacao_caso: identificacaoCasoEditado.trim() || null,
-        cnpj_cliente: cnpjCasoEditado.trim(),
+        ...(cnpjJaDefinido ? {} : { cnpj_cliente: cnpjCasoEditado.trim() }),
       });
       await queryClient.invalidateQueries({ queryKey: ["casos"] });
       setCasoEmEdicao(null);
@@ -258,6 +265,14 @@ export function LayoutApp() {
             </button>
             <button
               type="button"
+              className={`${estilos.navItem} ${location.pathname.includes("/clientes-casos") ? estilos.navItemAtivo : ""}`}
+              onClick={() => casoId && navigate(`/casos/${casoId}/clientes-casos`)}
+            >
+              <span className={estilos.navBolha} />
+              Clientes/Casos
+            </button>
+            <button
+              type="button"
               className={`${estilos.navItem} ${estaAtivo("/consulta") ? estilos.navItemAtivo : ""}`}
               onClick={() => casoId && navigate(`/casos/${casoId}/consulta`)}
             >
@@ -350,8 +365,13 @@ export function LayoutApp() {
             placeholder="00.000.000/0000-00"
             value={cnpjCasoEditado}
             onChange={(evento) => setCnpjCasoEditado(evento.target.value)}
-            required
+            disabled={cnpjJaDefinido}
+            readOnly={cnpjJaDefinido}
+            required={!cnpjJaDefinido}
           />
+          {cnpjJaDefinido && (
+            <p className={estilos.avisoCnpjImutavel}>O CNPJ não pode ser alterado após o cadastro.</p>
+          )}
           <div className={estilos.acoesModalNovoCaso}>
             <Botao type="button" variante="secundario" onClick={() => setCasoEmEdicao(null)}>
               Cancelar

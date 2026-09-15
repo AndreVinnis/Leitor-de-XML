@@ -1,0 +1,102 @@
+.pagina {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-4);
+}
+
+.cabecalho {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.titulo {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--cor-texto);
+  margin: 0;
+}
+
+.subtitulo {
+  font-size: 14px;
+  color: var(--cor-texto-secundario);
+  margin: 0;
+}
+
+.barraFiltros {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--espaco-2);
+}
+
+.campoBusca {
+  width: 320px;
+  height: 43px;
+  padding: 13px 14px;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-borda);
+  background: var(--cor-superficie);
+  color: var(--cor-texto);
+  font-size: var(--tamanho-texto-base);
+}
+
+.acoes {
+  display: flex;
+  gap: var(--espaco-2);
+}
+
+.acaoNeutra,
+.acaoErro {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.acaoNeutra {
+  background: var(--cor-superficie);
+  border-color: var(--cor-borda);
+  color: var(--cor-texto-secundario);
+}
+
+.acaoErro {
+  background: var(--cor-erro-fundo);
+  color: var(--cor-erro);
+}
+
+.formModal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-3);
+}
+
+.nomeClienteModal {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--cor-texto);
+  margin: 0;
+}
+
+.textoAjuda {
+  font-size: 13px;
+  color: var(--cor-texto-secundario);
+  margin: 0;
+}
+
+.acoesModal {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--espaco-3);
+}
+
+.botaoExcluir {
+  background: var(--cor-erro);
+  border-color: var(--cor-erro);
+}

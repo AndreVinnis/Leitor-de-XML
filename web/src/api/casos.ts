@@ -1,4 +1,4 @@
-import { get, patchJson, postJson } from "./cliente";
+import { del, get, patchJson, postJson } from "./cliente";
 import type { ClienteCaso } from "./tipos";
 
 export function listarCasos(): Promise<ClienteCaso[]> {
@@ -26,4 +26,8 @@ export interface DadosAtualizacaoCaso {
 
 export function atualizarCaso(id: number, dados: DadosAtualizacaoCaso): Promise<ClienteCaso> {
   return patchJson<ClienteCaso>(`/api/casos/${id}`, dados);
+}
+
+export function excluirCaso(id: number): Promise<void> {
+  return del<void>(`/api/casos/${id}`);
 }
