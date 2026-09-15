@@ -17,7 +17,6 @@ def _serializar(log: LogAuditoria, usuario_nome: str) -> dict:
         "usuario_nome": usuario_nome,
         "acao": log.acao,
         "resumo": log.resultado_resumo,
-        "tem_detalhes": bool(log.pergunta_usuario or log.sql_gerado),
         "pergunta_usuario": log.pergunta_usuario,
         "sql_gerado": log.sql_gerado,
     }

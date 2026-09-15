@@ -44,14 +44,11 @@ export function LogsAuditoria() {
     {
       chave: "acoes",
       titulo: "",
-      renderizar: (log) =>
-        log.tem_detalhes ? (
-          <button type="button" className={estilos.verDetalhes} onClick={() => setSelecionado(log)}>
-            Ver detalhes
-          </button>
-        ) : (
-          <span className={estilos.semDetalhes}>—</span>
-        ),
+      renderizar: (log) => (
+        <button type="button" className={estilos.verDetalhes} onClick={() => setSelecionado(log)}>
+          Ver detalhes
+        </button>
+      ),
     },
   ];
 
@@ -98,24 +95,22 @@ export function LogsAuditoria() {
       {selecionado && (
         <Modal aberto onFechar={() => setSelecionado(null)} titulo="Detalhes do log">
           <div className={estilos.detalheModal}>
-            {selecionado.pergunta_usuario && (
-              <div>
-                <p className={estilos.rotuloDetalhe}>Pergunta do usuário</p>
-                <p className={estilos.valorDetalhe}>{selecionado.pergunta_usuario}</p>
-              </div>
-            )}
-            {selecionado.sql_gerado && (
-              <div>
-                <p className={estilos.rotuloDetalhe}>SQL gerado</p>
-                <p className={estilos.valorDetalheCodigo}>{selecionado.sql_gerado}</p>
-              </div>
-            )}
-            {selecionado.resumo && (
-              <div>
-                <p className={estilos.rotuloDetalhe}>Resultado</p>
-                <p className={estilos.valorDetalhe}>{selecionado.resumo}</p>
-              </div>
-            )}
+            <div>
+              <p className={estilos.rotuloDetalhe}>Ação</p>
+              <p className={estilos.valorDetalhe}>{selecionado.acao}</p>
+            </div>
+            <div>
+              <p className={estilos.rotuloDetalhe}>Pergunta do usuário</p>
+              <p className={estilos.valorDetalhe}>{selecionado.pergunta_usuario ?? "—"}</p>
+            </div>
+            <div>
+              <p className={estilos.rotuloDetalhe}>Resultado</p>
+              <p className={estilos.valorDetalhe}>{selecionado.resumo ?? "—"}</p>
+            </div>
+            <div>
+              <p className={estilos.rotuloDetalhe}>SQL gerado</p>
+              <p className={estilos.valorDetalheCodigo}>{selecionado.sql_gerado ?? "—"}</p>
+            </div>
             <div className={estilos.acoesModal}>
               <Botao type="button" variante="secundario" onClick={() => setSelecionado(null)}>
                 Fechar

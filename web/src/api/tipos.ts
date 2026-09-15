@@ -256,7 +256,6 @@ export interface LogAuditoria {
   usuario_nome: string;
   acao: string;
   resumo: string | null;
-  tem_detalhes: boolean;
   pergunta_usuario: string | null;
   sql_gerado: string | null;
 }

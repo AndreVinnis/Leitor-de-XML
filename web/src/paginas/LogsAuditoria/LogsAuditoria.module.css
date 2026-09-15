@@ -61,10 +61,6 @@
   cursor: pointer;
 }
 
-.semDetalhes {
-  color: var(--cor-texto-secundario);
-}
-
 .detalheModal {
   display: flex;
   flex-direction: column;

@@ -81,7 +81,6 @@ def test_listar_logs_inclui_detalhe_de_consulta_ia(client, db_session_factory, l
 
     assert resp.status_code == 200
     item = resp.json()["itens"][0]
-    assert item["tem_detalhes"] is True
     assert item["pergunta_usuario"] == "Quantas notas entraram em agosto?"
     assert item["sql_gerado"] == "SELECT COUNT(*) FROM notas"
 
@@ -97,7 +96,6 @@ def test_listar_logs_sem_detalhe_extra(client, db_session_factory, logar_usuario
     resp = client.get("/api/logs-auditoria")
 
     item = resp.json()["itens"][0]
-    assert item["tem_detalhes"] is False
     assert item["pergunta_usuario"] is None
     assert item["sql_gerado"] is None
 
