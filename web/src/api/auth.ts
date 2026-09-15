@@ -34,6 +34,14 @@ export function solicitarRedefinicaoSenha(email: string): Promise<void> {
   });
 }
 
+export function redefinirSenha(token: string, novaSenha: string): Promise<void> {
+  return post<void>("/api/auth/reset-password", {
+    semAuth: true,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, password: novaSenha }),
+  });
+}
+
 /**
  * PATCH /api/auth/users/me (fastapi-users) já existe e já aceita nome/email
  * do próprio usuário -- UsuarioUpdate (app/schemas/usuario.py) não expõe
