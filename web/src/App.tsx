@@ -8,6 +8,7 @@ import { ProvedorToast } from "./componentes/Toast";
 import { LayoutApp } from "./layout/LayoutApp";
 import { Login } from "./paginas/Login/Login";
 import { CriarConta } from "./paginas/CriarConta/CriarConta";
+import { RedefinirSenha } from "./paginas/RedefinirSenha/RedefinirSenha";
 import { Dashboard } from "./paginas/Dashboard/Dashboard";
 import { UploadXml } from "./paginas/UploadXml/UploadXml";
 import { NotasFiscais } from "./paginas/NotasFiscais/NotasFiscais";
@@ -61,6 +62,7 @@ export function App() {
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/criar-conta" element={<CriarConta />} />
+              <Route path="/redefinir-senha" element={<RedefinirSenha />} />
               <Route element={<RotaProtegida />}>
                 <Route element={<ProvedorCasosLayout />}>
                   <Route element={<LayoutApp />}>
