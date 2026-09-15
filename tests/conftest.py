@@ -81,6 +81,7 @@ def db_session_factory(monkeypatch):
     monkeypatch.setattr("app.api.routes_dashboard.SessionLocal", TestSessionLocal)
     monkeypatch.setattr("app.api.routes_consulta.SessionLocal", TestSessionLocal)
     monkeypatch.setattr("app.api.routes_usuarios.SessionLocal", TestSessionLocal)
+    monkeypatch.setattr("app.api.routes_auditoria.SessionLocal", TestSessionLocal)
     monkeypatch.setattr("app.scripts.backfill_embeddings.SessionLocal", TestSessionLocal)
 
     yield TestSessionLocal

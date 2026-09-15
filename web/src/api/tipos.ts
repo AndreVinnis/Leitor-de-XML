@@ -247,3 +247,21 @@ export interface ResultadoDecisaoCadastro {
 export interface ResultadoDecisaoCadastroLote {
   resultados: ResultadoDecisaoCadastro[];
 }
+
+// -- Auditoria (app/api/routes_auditoria.py) ------------------------------
+
+export interface LogAuditoria {
+  id: number;
+  criado_em: string;
+  usuario_nome: string;
+  acao: string;
+  resumo: string | null;
+  tem_detalhes: boolean;
+  pergunta_usuario: string | null;
+  sql_gerado: string | null;
+}
+
+export interface ListaLogsAuditoria {
+  itens: LogAuditoria[];
+  total: number;
+}

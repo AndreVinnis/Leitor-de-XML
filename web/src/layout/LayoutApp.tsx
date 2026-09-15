@@ -68,7 +68,11 @@ export function LayoutApp() {
   function selecionarCaso(id: number) {
     setSeletorAberto(false);
     setBusca("");
-    navigate(`/casos/${id}/dashboard`);
+    // Mantém a tela atual ao trocar de caso, só a descartando quando ela
+    // aponta para um recurso específico do caso anterior (ex.: /notas/:notaId),
+    // caso em que volta para a listagem da seção.
+    const secao = location.pathname.split("/")[3] ?? "dashboard";
+    navigate(`/casos/${id}/${secao}`);
   }
 
   function abrirModalNovoCaso() {
@@ -295,6 +299,16 @@ export function LayoutApp() {
               >
                 <span className={estilos.navBolha} />
                 Aprovação de Cadastros
+              </button>
+            )}
+            {usuario?.role === "administrador" && (
+              <button
+                type="button"
+                className={`${estilos.navItem} ${estaAtivo("/logs-auditoria") ? estilos.navItemAtivo : ""}`}
+                onClick={() => casoId && navigate(`/casos/${casoId}/logs-auditoria`)}
+              >
+                <span className={estilos.navBolha} />
+                Auditoria
               </button>
             )}
           </nav>

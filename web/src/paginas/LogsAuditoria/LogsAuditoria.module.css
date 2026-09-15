@@ -1,0 +1,100 @@
+.pagina {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-4);
+}
+
+.cabecalho {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.titulo {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--cor-texto);
+  margin: 0;
+}
+
+.subtitulo {
+  font-size: 14px;
+  color: var(--cor-texto-secundario);
+  margin: 0;
+}
+
+.barraFiltros {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  flex-wrap: wrap;
+}
+
+.campoData {
+  width: 140px;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-borda);
+  background: var(--cor-superficie);
+  color: var(--cor-texto-secundario);
+  font-size: 13px;
+}
+
+.resumo {
+  display: block;
+  max-width: 360px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.verDetalhes {
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--cor-primaria);
+  border-radius: var(--raio-borda);
+  background: transparent;
+  color: var(--cor-primaria);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.semDetalhes {
+  color: var(--cor-texto-secundario);
+}
+
+.detalheModal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-3);
+}
+
+.rotuloDetalhe {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cor-texto-secundario);
+  text-transform: uppercase;
+  margin: 0 0 4px;
+}
+
+.valorDetalhe {
+  font-size: 13px;
+  color: var(--cor-texto);
+  margin: 0;
+}
+
+.valorDetalheCodigo {
+  font-size: 13px;
+  color: var(--cor-texto);
+  margin: 0;
+  font-family: "Courier New", monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.acoesModal {
+  display: flex;
+  justify-content: flex-end;
+}
