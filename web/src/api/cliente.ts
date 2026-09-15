@@ -103,6 +103,10 @@ export function patch<T>(caminho: string, opcoes?: OpcoesRequisicao) {
   return requisitar<T>(caminho, { ...opcoes, method: "PATCH" });
 }
 
+export function del<T>(caminho: string, opcoes?: OpcoesRequisicao) {
+  return requisitar<T>(caminho, { ...opcoes, method: "DELETE" });
+}
+
 export function postJson<T>(caminho: string, corpo: unknown, opcoes?: OpcoesRequisicao) {
   return post<T>(caminho, {
     ...opcoes,

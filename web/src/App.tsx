@@ -13,6 +13,7 @@ import { UploadXml } from "./paginas/UploadXml/UploadXml";
 import { NotasFiscais } from "./paginas/NotasFiscais/NotasFiscais";
 import { NotaFiscal } from "./paginas/NotaFiscal/NotaFiscal";
 import { Produtos } from "./paginas/Produtos/Produtos";
+import { ClientesCasos } from "./paginas/ClientesCasos/ClientesCasos";
 import { ItensVinculados } from "./paginas/ItensVinculados/ItensVinculados";
 import { Consulta } from "./paginas/Consulta/Consulta";
 import { Configuracoes } from "./paginas/Configuracoes/Configuracoes";
@@ -72,6 +73,7 @@ export function App() {
                       path="casos/:casoId/produtos/canonicos/:produtoCanonicoId"
                       element={<ItensVinculados />}
                     />
+                    <Route path="casos/:casoId/clientes-casos" element={<ClientesCasos />} />
                     <Route path="casos/:casoId/consulta" element={<Consulta />} />
                     <Route path="casos/:casoId/configuracoes" element={<Configuracoes />} />
                     <Route element={<RotaAdmin />}>

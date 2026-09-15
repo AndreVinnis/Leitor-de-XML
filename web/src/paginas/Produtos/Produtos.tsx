@@ -138,6 +138,13 @@ export function Produtos() {
       </div>
 
       {aba === "sugestoes" ? <AbaSugestoes /> : <AbaCanonicos />}
+
+      {normalizando && (
+        <div className={estilos.avisoNormalizando} role="status">
+          <span className={estilos.spinner} />
+          <span>Normalizando itens, isso pode demorar um pouco...</span>
+        </div>
+      )}
     </div>
   );
 }

@@ -250,6 +250,12 @@
   justify-content: flex-end;
 }
 
+.avisoCnpjImutavel {
+  margin: -8px 0 0;
+  font-size: 13px;
+  color: var(--cor-texto-secundario);
+}
+
 .blocoUsuario {
   display: flex;
   align-items: center;
