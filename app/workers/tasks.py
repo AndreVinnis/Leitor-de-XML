@@ -219,10 +219,8 @@ def enviar_email_redefinicao_senha(usuario_id: int, token: str) -> dict:
     UserManager.on_after_forgot_password (app/core/auth.py) sempre que
     POST /api/auth/forgot-password é chamado para um e-mail cadastrado.
 
-    O link aponta para settings.api_base_url + uma rota de frontend
-    ("/redefinir-senha") que ainda não existe -- está fora do escopo atual
-    (só o backend das 4 telas do protótipo). Quando essa tela for
-    construída, o caminho abaixo é o único lugar que precisa mudar.
+    O link aponta para settings.frontend_base_url + a rota de frontend
+    "/redefinir-senha" (Projeto/web/src/paginas/RedefinirSenha).
     """
     db = SessionLocal()
     try:
@@ -230,7 +228,7 @@ def enviar_email_redefinicao_senha(usuario_id: int, token: str) -> dict:
         if usuario is None:
             return {"status": "erro", "motivo": "usuário não encontrado"}
 
-        link = f"{settings.api_base_url}/redefinir-senha?token={token}"
+        link = f"{settings.frontend_base_url}/redefinir-senha?token={token}"
         corpo = (
             f"Olá, {usuario.nome}.\n\n"
             "Recebemos um pedido para redefinir sua senha. Se foi você, "

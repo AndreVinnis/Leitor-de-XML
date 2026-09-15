@@ -12,6 +12,10 @@ class Settings(BaseSettings):
     secret_key: str = "change-me"
 
     api_base_url: str = "http://localhost:8000"
+    # Origem do frontend React (web/), usada para montar links enviados por
+    # e-mail que apontam para telas do app (ex.: redefinição de senha) --
+    # api_base_url aponta para o backend, não serve para isso.
+    frontend_base_url: str = "http://localhost:5173"
     token_aprovacao_expira_minutos: int = 30
 
     # Origens autorizadas a chamar a API pelo browser (CORS). Lista separada

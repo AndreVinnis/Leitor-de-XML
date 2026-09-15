@@ -109,7 +109,7 @@ def test_envia_email_de_redefinicao_de_senha(mock_enviar_email, db_session_facto
     destinatario, assunto, corpo = mock_enviar_email.call_args[0]
     assert destinatario == "fulano2@x.com"
     assert "token-abc" in corpo
-    assert settings.api_base_url in corpo
+    assert settings.frontend_base_url in corpo
 
 
 @patch("app.workers.tasks.enviar_email")
