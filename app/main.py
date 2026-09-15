@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from app.api import (
+    routes_auditoria,
     routes_auth,
     routes_casos,
     routes_consulta,
@@ -63,6 +64,7 @@ app.include_router(routes_casos.router, prefix="/api/casos", tags=["casos"])
 app.include_router(routes_dashboard.router, prefix="/api/dashboard", tags=["dashboard"])
 app.include_router(routes_consulta.router, prefix="/api/consulta", tags=["consulta"])
 app.include_router(routes_usuarios.router, prefix="/api/usuarios", tags=["usuarios"])
+app.include_router(routes_auditoria.router, prefix="/api/logs-auditoria", tags=["auditoria"])
 
 
 @app.get("/health")

@@ -18,6 +18,7 @@ import { ItensVinculados } from "./paginas/ItensVinculados/ItensVinculados";
 import { Consulta } from "./paginas/Consulta/Consulta";
 import { Configuracoes } from "./paginas/Configuracoes/Configuracoes";
 import { AprovacaoDeCadastros } from "./paginas/AprovacaoDeCadastros/AprovacaoDeCadastros";
+import { LogsAuditoria } from "./paginas/LogsAuditoria/LogsAuditoria";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -78,6 +79,7 @@ export function App() {
                     <Route path="casos/:casoId/configuracoes" element={<Configuracoes />} />
                     <Route element={<RotaAdmin />}>
                       <Route path="casos/:casoId/aprovacao-de-cadastros" element={<AprovacaoDeCadastros />} />
+                      <Route path="casos/:casoId/logs-auditoria" element={<LogsAuditoria />} />
                     </Route>
                   </Route>
                 </Route>
