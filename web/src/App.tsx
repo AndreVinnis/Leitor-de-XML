@@ -11,6 +11,7 @@ import { CriarConta } from "./paginas/CriarConta/CriarConta";
 import { RedefinirSenha } from "./paginas/RedefinirSenha/RedefinirSenha";
 import { Dashboard } from "./paginas/Dashboard/Dashboard";
 import { UploadXml } from "./paginas/UploadXml/UploadXml";
+import { LotesComErro } from "./paginas/LotesComErro/LotesComErro";
 import { NotasFiscais } from "./paginas/NotasFiscais/NotasFiscais";
 import { NotaFiscal } from "./paginas/NotaFiscal/NotaFiscal";
 import { Produtos } from "./paginas/Produtos/Produtos";
@@ -69,6 +70,7 @@ export function App() {
                     <Route index element={<RedirecionamentoInicial />} />
                     <Route path="casos/:casoId/dashboard" element={<Dashboard />} />
                     <Route path="casos/:casoId/upload" element={<UploadXml />} />
+                    <Route path="casos/:casoId/lotes-com-erro" element={<LotesComErro />} />
                     <Route path="casos/:casoId/notas" element={<NotasFiscais />} />
                     <Route path="casos/:casoId/notas/:notaId" element={<NotaFiscal />} />
                     <Route path="casos/:casoId/produtos" element={<Produtos />} />

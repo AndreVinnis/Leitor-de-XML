@@ -252,6 +252,93 @@ def test_obter_nota_inexistente_retorna_404(client, db_session_factory, logar_us
     assert resp.status_code == 404
 
 
+def test_listar_lotes_com_erro_retorna_so_lotes_com_erro_e_usuario(client, db_session_factory, logar_usuario):
+    session = db_session_factory()
+    usuario = _criar_usuario(session, email="ana@x.com")
+    usuario.nome = "Ana Paula"
+    caso = _criar_caso(session)
+
+    lote_com_erro = Lote(
+        id="lote-com-erro",
+        cliente_caso_id=caso.id,
+        cnpj_cliente=CNPJ_CLIENTE,
+        total_arquivos=2,
+        criado_por_usuario_id=usuario.id,
+    )
+    lote_sem_erro = Lote(
+        id="lote-sem-erro",
+        cliente_caso_id=caso.id,
+        cnpj_cliente=CNPJ_CLIENTE,
+        total_arquivos=1,
+        criado_por_usuario_id=usuario.id,
+    )
+    session.add_all([lote_com_erro, lote_sem_erro])
+    session.flush()
+    session.add_all(
+        [
+            ArquivoLote(
+                lote_id=lote_com_erro.id,
+                nome_arquivo="a.xml",
+                status=StatusProcessamento.ERRO,
+                motivo_erro="chave inválida",
+            ),
+            ArquivoLote(lote_id=lote_com_erro.id, nome_arquivo="b.xml", status=StatusProcessamento.SUCESSO),
+            ArquivoLote(lote_id=lote_sem_erro.id, nome_arquivo="c.xml", status=StatusProcessamento.SUCESSO),
+        ]
+    )
+    session.commit()
+    session.close()
+    logar_usuario(usuario)
+
+    resp = client.get(f"/api/notas/lotes?cliente_caso_id={caso.id}")
+    assert resp.status_code == 200
+    corpo = resp.json()
+    assert corpo["total"] == 1
+    item = corpo["itens"][0]
+    assert item["id"] == lote_com_erro.id
+    assert item["usuario_nome"] == "Ana Paula"
+    assert item["total_arquivos"] == 2
+    assert item["arquivos_com_erro"] == 1
+
+
+def test_listar_lotes_com_erro_pagina_resultados(client, db_session_factory, logar_usuario):
+    session = db_session_factory()
+    usuario = _criar_usuario(session)
+    caso = _criar_caso(session)
+
+    for i in range(3):
+        lote = Lote(
+            id=f"lote-erro-{i}",
+            cliente_caso_id=caso.id,
+            cnpj_cliente=CNPJ_CLIENTE,
+            total_arquivos=1,
+            criado_por_usuario_id=usuario.id,
+        )
+        session.add(lote)
+        session.flush()
+        session.add(
+            ArquivoLote(lote_id=lote.id, nome_arquivo="a.xml", status=StatusProcessamento.ERRO, motivo_erro="x")
+        )
+    session.commit()
+    session.close()
+    logar_usuario(usuario)
+
+    resp = client.get(f"/api/notas/lotes?cliente_caso_id={caso.id}&limit=2&offset=0")
+    assert resp.status_code == 200
+    corpo = resp.json()
+    assert corpo["total"] == 3
+    assert len(corpo["itens"]) == 2
+
+    resp_pagina_2 = client.get(f"/api/notas/lotes?cliente_caso_id={caso.id}&limit=2&offset=2")
+    assert len(resp_pagina_2.json()["itens"]) == 1
+
+
+def test_listar_lotes_com_erro_sem_autenticacao_retorna_401(client, db_session_factory):
+    db_session_factory()
+    resp = client.get("/api/notas/lotes")
+    assert resp.status_code == 401
+
+
 def test_progresso_lote(client, db_session_factory, logar_usuario):
     session = db_session_factory()
     usuario = _criar_usuario(session)

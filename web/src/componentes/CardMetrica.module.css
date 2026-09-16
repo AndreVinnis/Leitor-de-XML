@@ -28,3 +28,9 @@
 .erro {
   color: var(--cor-erro);
 }
+
+.verDetalhes {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--cor-primaria);
+}

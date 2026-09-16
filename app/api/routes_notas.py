@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.core.auth import usuario_atual_ativo
@@ -75,6 +75,57 @@ async def listar_notas(
                 "status": status_arquivo.value if status_arquivo is not None else None,
             }
             for nota, status_arquivo in resultados
+        ]
+        return {"itens": itens, "total": total}
+    finally:
+        db.close()
+
+
+@router.get("/lotes")
+async def listar_lotes_com_erro(
+    cliente_caso_id: int | None = None,
+    limit: int = 20,
+    offset: int = 0,
+    usuario: Usuario = Depends(usuario_atual_ativo),
+):
+    """
+    Alimenta a tela "Lotes com erro" (a partir do card Erros do Dashboard):
+    só lotes com pelo menos um ArquivoLote em ERRO, com quem fez o upload e
+    quando -- dado que já existe em Lote.criado_por_usuario_id/criado_em,
+    mas nenhum endpoint expunha até agora (ver app/models/models.py).
+    """
+    db: Session = SessionLocal()
+    try:
+        erros_por_lote = (
+            db.query(
+                ArquivoLote.lote_id.label("lote_id"),
+                func.count(ArquivoLote.id).label("arquivos_com_erro"),
+            )
+            .filter(ArquivoLote.status == StatusProcessamento.ERRO)
+            .group_by(ArquivoLote.lote_id)
+            .subquery()
+        )
+
+        query = (
+            db.query(Lote, Usuario.nome, erros_por_lote.c.arquivos_com_erro)
+            .join(erros_por_lote, erros_por_lote.c.lote_id == Lote.id)
+            .outerjoin(Usuario, Usuario.id == Lote.criado_por_usuario_id)
+        )
+        if cliente_caso_id is not None:
+            query = query.filter(Lote.cliente_caso_id == cliente_caso_id)
+
+        total = query.count()
+        resultados = query.order_by(Lote.criado_em.desc()).offset(offset).limit(limit).all()
+
+        itens = [
+            {
+                "id": lote.id,
+                "criado_em": lote.criado_em,
+                "usuario_nome": usuario_nome,
+                "total_arquivos": lote.total_arquivos,
+                "arquivos_com_erro": arquivos_com_erro,
+            }
+            for lote, usuario_nome, arquivos_com_erro in resultados
         ]
         return {"itens": itens, "total": total}
     finally:
