@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { atualizarCaso, excluirCaso, listarCasos } from "../../api/casos";
+import { atualizarCaso, criarCaso, excluirCaso, listarCasos } from "../../api/casos";
 import { ErroApi } from "../../api/cliente";
 import type { ClienteCaso } from "../../api/tipos";
 import { useAuth } from "../../auth/ContextoAuth";
@@ -27,6 +27,7 @@ export function ClientesCasos() {
   const [offset, setOffset] = useState(0);
   const [editando, setEditando] = useState<ClienteCaso | null>(null);
   const [excluindo, setExcluindo] = useState<ClienteCaso | null>(null);
+  const [criando, setCriando] = useState(false);
 
   useEffect(() => {
     const temporizador = setTimeout(() => setBusca(buscaDigitada), 400);
@@ -115,8 +116,7 @@ export function ClientesCasos() {
       <div className={estilos.cabecalho}>
         <h1 className={estilos.titulo}>Clientes e Casos</h1>
         <p className={estilos.subtitulo}>
-          Edite os dados ou exclua um cliente/caso. Para cadastrar um novo, use o seletor de cliente/caso na barra
-          superior.
+          Cadastre, edite ou exclua um cliente/caso.
         </p>
       </div>
 
@@ -131,6 +131,9 @@ export function ClientesCasos() {
             resetarPagina();
           }}
         />
+        <Botao type="button" onClick={() => setCriando(true)}>
+          + Novo cliente/caso
+        </Botao>
       </div>
 
       <Card>
@@ -142,6 +145,17 @@ export function ClientesCasos() {
         />
         <Paginacao offset={offset} limite={LIMITE} total={casosFiltrados.length} onMudar={setOffset} />
       </Card>
+
+      {criando && (
+        <ModalCriarClienteCaso
+          onFechar={() => setCriando(false)}
+          onSalvo={async () => {
+            setCriando(false);
+            await invalidarCasos();
+            notificar("Cliente/caso criado com sucesso.", "sucesso");
+          }}
+        />
+      )}
 
       {editando && (
         <ModalEditarClienteCaso
@@ -178,6 +192,69 @@ export function ClientesCasos() {
         </Modal>
       )}
     </div>
+  );
+}
+
+interface ModalCriarClienteCasoProps {
+  onFechar: () => void;
+  onSalvo: () => void;
+}
+
+function ModalCriarClienteCaso({ onFechar, onSalvo }: ModalCriarClienteCasoProps) {
+  const { notificar } = useToast();
+  const [nome, setNome] = useState("");
+  const [identificacao, setIdentificacao] = useState("");
+  const [cnpj, setCnpj] = useState("");
+  const [salvando, setSalvando] = useState(false);
+
+  async function handleSubmit(evento: FormEvent) {
+    evento.preventDefault();
+    if (!nome.trim() || !cnpj.trim()) return;
+    setSalvando(true);
+    try {
+      await criarCaso(nome.trim(), cnpj.trim(), identificacao.trim() || undefined);
+      onSalvo();
+    } catch (excecao) {
+      notificar(excecao instanceof ErroApi ? excecao.message : "Erro de comunicação com a API.", "erro");
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  return (
+    <Modal aberto onFechar={onFechar} titulo="Novo cliente/caso">
+      <form onSubmit={handleSubmit} className={estilos.formModal}>
+        <CampoTexto
+          rotulo="Nome do cliente"
+          placeholder="Digite o nome do cliente"
+          autoFocus
+          value={nome}
+          onChange={(evento) => setNome(evento.target.value)}
+          required
+        />
+        <CampoTexto
+          rotulo="Identificação do caso"
+          placeholder="Ex.: Proc. 1234"
+          value={identificacao}
+          onChange={(evento) => setIdentificacao(evento.target.value)}
+        />
+        <CampoTexto
+          rotulo="CNPJ"
+          placeholder="00.000.000/0000-00"
+          value={cnpj}
+          onChange={(evento) => setCnpj(evento.target.value)}
+          required
+        />
+        <div className={estilos.acoesModal}>
+          <Botao type="button" variante="secundario" onClick={onFechar}>
+            Cancelar
+          </Botao>
+          <Botao type="submit" disabled={salvando}>
+            {salvando ? "Criando..." : "Criar cliente/caso"}
+          </Botao>
+        </div>
+      </form>
+    </Modal>
   );
 }
 
