@@ -1,6 +1,7 @@
 from io import BytesIO
 from unittest.mock import MagicMock
 
+from app.api.routes_upload import LIMITE_ARQUIVOS_POR_LOTE
 from app.models.models import (
     ArquivoLote,
     ClienteCaso,
@@ -105,6 +106,35 @@ def test_upload_com_cnpj_invalido_retorna_422_e_nao_cria_lote(
     resp = client.post(
         "/api/notas/upload",
         data={"cliente_caso_id": caso.id, "cnpj_cliente": "98765432000188"},
+        files=arquivos,
+    )
+    assert resp.status_code == 422
+    fake_processar.delay.assert_not_called()
+
+    session = db_session_factory()
+    assert session.query(Lote).count() == 0
+    session.close()
+
+
+def test_upload_acima_do_limite_retorna_422_e_nao_cria_lote(
+    client, db_session_factory, logar_usuario, monkeypatch
+):
+    fake_processar = MagicMock()
+    monkeypatch.setattr("app.api.routes_upload.processar_xml_nfe", fake_processar)
+
+    session = db_session_factory()
+    usuario = _criar_usuario(session, "adv-upload-limite@x.com")
+    caso = _criar_caso(session, "Cliente Upload Limite")
+    session.close()
+    logar_usuario(usuario)
+
+    arquivos = [
+        ("arquivos", (f"nota{i}.xml", BytesIO(b"<a/>"), "text/xml"))
+        for i in range(LIMITE_ARQUIVOS_POR_LOTE + 1)
+    ]
+    resp = client.post(
+        "/api/notas/upload",
+        data={"cliente_caso_id": caso.id, "cnpj_cliente": CNPJ_CLIENTE},
         files=arquivos,
     )
     assert resp.status_code == 422
