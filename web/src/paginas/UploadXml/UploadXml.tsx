@@ -26,6 +26,32 @@ function statusParaBadge(status: StatusNota | null): StatusBadge {
   return status === "duplicado" ? "neutro" : status ?? "pendente";
 }
 
+// Último lote enviado por caso, para o card de progresso sobreviver a sair
+// da tela e voltar (navegação, F5) -- sem isso, `loteId` vivia só no estado
+// do componente e sumia ao desmontar, escondendo até nota com erro atrás de
+// "nenhum lote enviado ainda". sessionStorage porque é o mesmo padrão já
+// usado pro usuário logado (ver auth/ContextoAuth.tsx): sobrevive à
+// navegação, não precisa sobreviver ao fechar a aba.
+function chaveUltimoLote(casoId: number): string {
+  return `ultimo_lote_caso_${casoId}`;
+}
+
+function lerUltimoLote(casoId: number): string | null {
+  try {
+    return sessionStorage.getItem(chaveUltimoLote(casoId));
+  } catch {
+    return null;
+  }
+}
+
+function salvarUltimoLote(casoId: number, loteId: string) {
+  try {
+    sessionStorage.setItem(chaveUltimoLote(casoId), loteId);
+  } catch {
+    /* sessionStorage indisponível (aba privada etc.) -- segue sem persistir */
+  }
+}
+
 export function UploadXml() {
   const { casoId } = useParams<{ casoId: string }>();
   const casoIdNumero = Number(casoId);
@@ -39,6 +65,14 @@ export function UploadXml() {
   const [offsetProgresso, setOffsetProgresso] = useState(0);
   const [arrastando, setArrastando] = useState(false);
   const inputArquivosRef = useRef<HTMLInputElement>(null);
+
+  // A rota é a mesma ao trocar de caso (casos/:casoId/upload não remonta o
+  // componente, só troca o param), então recarrega o último lote desse caso
+  // aqui em vez de num lazy initializer do useState -- cobre tanto o mount
+  // inicial quanto a troca de caso pelo seletor do topo.
+  useEffect(() => {
+    setLoteId(lerUltimoLote(casoIdNumero));
+  }, [casoIdNumero]);
 
   // Reseta a paginação quando a lista muda de "fonte" -- lote novo enviado,
   // ou lista de arquivos selecionados esvaziada (após envio) -- senão o
@@ -55,6 +89,7 @@ export function UploadXml() {
     mutationFn: () => uploadNotas(casoIdNumero, casoAtivo!.cnpj_cliente!, arquivos),
     onSuccess: (resposta) => {
       setLoteId(resposta.lote_id);
+      salvarUltimoLote(casoIdNumero, resposta.lote_id);
       notificar(`Lote enviado: ${resposta.total_arquivos} arquivo(s) em processamento.`);
       setArquivos([]);
     },
