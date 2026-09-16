@@ -1,0 +1,114 @@
+.pagina {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-4);
+}
+
+.cabecalho {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.titulo {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--cor-texto);
+  margin: 0;
+}
+
+.subtitulo {
+  font-size: 14px;
+  color: var(--cor-texto-secundario);
+  margin: 0;
+}
+
+.tabela {
+  display: flex;
+  flex-direction: column;
+}
+
+.cabecalhoTabela {
+  display: grid;
+  grid-template-columns: 160px 120px 1fr 160px 230px;
+  gap: var(--espaco-3);
+  padding-bottom: var(--espaco-2);
+  border-bottom: 1px solid var(--cor-borda);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--cor-texto-secundario);
+}
+
+.grupoLinha {
+  border-bottom: 1px solid var(--cor-borda);
+}
+
+.grupoLinha:last-child {
+  border-bottom: none;
+}
+
+.linha {
+  display: grid;
+  grid-template-columns: 160px 120px 1fr 160px 230px;
+  align-items: center;
+  gap: var(--espaco-3);
+  padding: var(--espaco-3) 0;
+  font-size: 13px;
+  color: var(--cor-texto);
+}
+
+.linha button {
+  white-space: nowrap;
+}
+
+.codigoLote {
+  font-family: "Courier New", monospace;
+  color: var(--cor-texto-secundario);
+}
+
+.subTabela {
+  display: flex;
+  flex-direction: column;
+  background: var(--cor-fundo);
+  border-radius: var(--raio-borda);
+  padding: var(--espaco-2) var(--espaco-3) var(--espaco-3);
+  margin-bottom: var(--espaco-3);
+}
+
+.cabecalhoSubTabela {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--espaco-3);
+  padding: var(--espaco-2) 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cor-texto-secundario);
+}
+
+.linhaSubTabela {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--espaco-3);
+  padding: var(--espaco-2) 0;
+}
+
+.nomeArquivo {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--cor-texto);
+}
+
+.motivoErro {
+  font-size: 13px;
+  color: var(--cor-texto-secundario);
+}
+
+.vazio {
+  padding: var(--espaco-4) 0;
+  text-align: center;
+  color: var(--cor-texto-secundario);
+  font-size: 14px;
+}

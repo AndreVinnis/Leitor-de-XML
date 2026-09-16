@@ -89,7 +89,12 @@ export function Dashboard() {
       <section className={estilos.cards}>
         <CardMetrica rotulo="Notas processadas" valor={estatisticas.data?.notas_processadas ?? "-"} cor="primaria" />
         <CardMetrica rotulo="Pendentes" valor={estatisticas.data?.pendentes ?? "-"} cor="accent" />
-        <CardMetrica rotulo="Erros" valor={estatisticas.data?.erros ?? "-"} cor="erro" />
+        <CardMetrica
+          rotulo="Erros"
+          valor={estatisticas.data?.erros ?? "-"}
+          cor="erro"
+          to={casoId ? `/casos/${casoId}/lotes-com-erro` : undefined}
+        />
       </section>
 
       <Card>

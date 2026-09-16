@@ -112,6 +112,19 @@ export interface ProgressoLote {
   arquivos: ArquivoLoteProgresso[];
 }
 
+export interface LoteComErro {
+  id: string;
+  criado_em: string;
+  usuario_nome: string | null;
+  total_arquivos: number;
+  arquivos_com_erro: number;
+}
+
+export interface ListaLotesComErro {
+  itens: LoteComErro[];
+  total: number;
+}
+
 // -- Produtos (app/api/routes_produtos.py) --------------------------------
 
 export type StatusRevisao = "pendente" | "confirmado" | "rejeitado";
