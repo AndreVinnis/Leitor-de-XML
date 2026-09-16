@@ -93,12 +93,14 @@ services:
     ports:
       - "5173:5173"
     environment:
-      # Inverso do serviço `frontend`: o React roda no browser do HOST, não
-      # dentro do container, então "api" (nome do serviço na rede do
-      # Compose) não resolve para o browser -- precisa ser localhost:8000.
-      # Trocar isso por engano (copiando o padrão do `frontend` acima) dá um
-      # erro de rede difícil de diagnosticar.
-      - VITE_API_BASE_URL=http://localhost:8000
+      # Vazio de propósito: o browser chama caminho relativo (/api/...), que
+      # o proxy do Vite (web/vite.config.ts, roda dentro deste container)
+      # encaminha para http://api:8000 -- é o proxy que resolve o nome do
+      # serviço, não o browser. Isso é o que faz o React e a API ficarem em
+      # mesma origem (localhost:5173) e o cookie HttpOnly de sessão
+      # funcionar sem CORS com credenciais. Ver "Onde fica o token" em
+      # web/README.md.
+      - VITE_API_BASE_URL=
     volumes:
       - ./web:/code
       - web_node_modules:/code/node_modules

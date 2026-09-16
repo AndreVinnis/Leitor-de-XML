@@ -5,7 +5,7 @@ from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
-from app.core.auth import auth_backend, fastapi_users
+from app.core.auth import auth_backend, cookie_backend, fastapi_users
 from app.core.database import SessionLocal
 from app.core.tokens import TokenExpirado, TokenInvalido, verificar_token_aprovacao
 from app.models.models import LogAuditoria, StatusCadastro, Usuario
@@ -15,6 +15,10 @@ from app.workers.tasks import enviar_notificacao_resultado_cadastro
 router = APIRouter()
 
 router.include_router(fastapi_users.get_auth_router(auth_backend), prefix="/jwt")
+# Cookie HttpOnly -- usado pelo frontend React (web/), que roda atrás do
+# proxy do Vite na mesma origem da API. O Streamlit e os testes continuam em
+# /jwt (Bearer).
+router.include_router(fastapi_users.get_auth_router(cookie_backend), prefix="/cookie")
 router.include_router(fastapi_users.get_register_router(UsuarioRead, UsuarioCreate))
 router.include_router(fastapi_users.get_users_router(UsuarioRead, UsuarioUpdate), prefix="/users")
 router.include_router(fastapi_users.get_reset_password_router())

@@ -30,34 +30,42 @@ npm install
 npm run dev
 ```
 
-## Armadilha de `VITE_API_BASE_URL`: o inverso do Streamlit
+## Same origem via proxy do Vite
 
-O serviço `frontend` (Streamlit) roda **dentro** do container e usa
-`API_BASE_URL=http://api:8000` -- é o nome do serviço na rede do Compose.
+O React e a API rodam na mesma origem, em dev também (produção já é assim --
+ver `Documentação/Deploy e Operação`, "Sirva o React e a API na mesma
+origem"). `web/vite.config.ts` tem um `server.proxy` que encaminha `/api/*`
+para `http://api:8000` -- o proxy roda no servidor Vite, **dentro** do
+container, por isso o alvo é o nome do serviço na rede do Compose, igual o
+Streamlit já fazia (`API_BASE_URL=http://api:8000`). O browser só enxerga o
+caminho relativo, então `VITE_API_BASE_URL` fica vazio (ver
+`docker-compose.yml`, serviço `web`).
 
-O React roda **no browser do host**, não dentro do container. `api` não
-resolve para o browser, então `VITE_API_BASE_URL` precisa ser
-`http://localhost:8000`. Copiar o padrão do `frontend` aqui dá um erro de
-rede difícil de diagnosticar (o container até builda e sobe normalmente --
-o erro só aparece no fetch, no browser).
+## Onde fica a sessão
 
-## Onde fica o token
+Cookie HttpOnly (`app/core/auth.py::cookie_backend`), sessão deslizante
+(`app/core/sessao_deslizante.py` reemite o cookie quando passa da metade da
+vida). Nenhum código em `src/` lê ou escreve o segredo da sessão -- o browser
+manda o cookie sozinho em toda requisição same-origin. `sessionStorage` ainda
+guarda o objeto `usuario` (não é segredo, só evita um round-trip a
+`/api/auth/users/me` a cada F5).
 
-`sessionStorage`, não `localStorage` nem cookie. Sobrevive ao F5 na mesma
-aba, morre quando a aba fecha, não vaza para outras abas. É o meio-termo
-razoável enquanto o backend autentica por Bearer
-(`app/core/auth.py::BearerTransport`). Migrar para cookie httpOnly exigiria
-`allow_credentials=True` no CORS e proteção CSRF -- fora de escopo por
-enquanto.
+Toda requisição que muda estado por cookie -- login por cookie incluído --
+precisa do header `X-Requested-With: XMLHttpRequest` (`src/api/cliente.ts`
+já manda em toda chamada; ver `app/core/csrf.py` para o porquê: `SameSite`
+não cobre um POST form-urlencoded cross-site nem impede o `Set-Cookie` de um
+login forjado).
 
 ## Armadilhas de contrato herdadas da API (ver `src/api/cliente.ts`)
 
-1. **401 é o caminho normal, não uma excecão rara.** O JWT dura 3600s e não
-   há refresh token; `POST /api/auth/jwt/logout` é um 204 no-op. Qualquer
-   401 limpa a sessão e volta pro login, tratado num lugar só.
+1. **401 é o caminho normal, não uma excecão rara.** A sessão desliza
+   sozinha enquanto usada, mas ainda expira se ficar ociosa; `POST
+   /api/auth/cookie/logout` invalida de verdade (o `/jwt` antigo, usado só
+   pelo Streamlit/testes, continua no-op). Qualquer 401 limpa a sessão e
+   volta pro login, tratado num lugar só.
 2. **Sem barra final nas URLs de coleção** (`/api/casos`, `/api/notas`,
    `/api/consulta`). Com barra, o backend responde 307 e o redirect pode
-   perder o header `Authorization`.
+   perder o cookie/header de autenticação.
 3. **200 com erro no corpo** nas rotas de revisão de sugestão de produto
    (`app/api/routes_produtos.py`). A tela de Produtos (`src/paginas/Produtos/`)
    trata isso na própria página, inspecionando o campo `status` do retorno --
@@ -68,7 +76,7 @@ enquanto.
 ```
 src/
   api/         cliente de fetch + um módulo por recurso (auth, casos, dashboard, notas)
-  auth/        ContextoAuth (token + usuário) e RotaProtegida
+  auth/        ContextoAuth (sessão por cookie + usuário) e RotaProtegida
   casos/       ContextoCaso (lista de casos, caso ativo vem da URL)
   componentes/ Botao, CampoTexto, Card, CardMetrica, Tabela, Paginacao, Select, Toast
   layout/      LayoutApp (sidebar + seletor de caso, espelha a sidebar do Streamlit)

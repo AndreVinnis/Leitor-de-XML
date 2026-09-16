@@ -16,7 +16,9 @@ from app.api import (
     routes_usuarios,
 )
 from app.core.config import settings
+from app.core.csrf import NOME_HEADER_ANTI_CSRF, ExigirHeaderAntiCsrfMiddleware
 from app.core.database import async_engine
+from app.core.sessao_deslizante import SessaoDeslizanteMiddleware
 
 
 @asynccontextmanager
@@ -43,17 +45,26 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# O frontend React (web/) roda no browser do host e chama a API por
-# fetch/XHR, então precisa de CORS -- o Streamlit nunca precisou porque
-# chama a API do lado do servidor com `requests`. allow_credentials fica
-# desligado de propósito: a autenticação é Bearer no header
-# (app/core/auth.py, BearerTransport), não cookie.
+# Ordem importa: add_middleware empilha por fora a cada chamada (a última
+# chamada vira a mais externa), então a ordem abaixo roda, num request,
+# CORS -> CSRF -> sessão deslizante -> rotas. CORS precisa ser a mais externa
+# para anexar cabeçalho até em resposta de erro (ex.: 403 do CSRF).
+app.add_middleware(SessaoDeslizanteMiddleware)
+app.add_middleware(ExigirHeaderAntiCsrfMiddleware)
+
+# O frontend React (web/) roda atrás do proxy do Vite na mesma origem da
+# API (produção também -- ver Documentação/Deploy e Operação), então CORS
+# aqui é defesa em profundidade para acesso direto fora do proxy, não o
+# caminho principal. allow_credentials continua desligado: o cookie de
+# sessão (app/core/auth.py::cookie_backend) só precisa funcionar same-origin,
+# nunca cross-origin -- se um dia isso deixar de valer, é sinal de que a
+# premissa de mesma origem quebrou.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[origem.strip() for origem in settings.cors_origins.split(",") if origem.strip()],
     allow_credentials=False,
     allow_methods=["*"],
-    allow_headers=["Authorization", "Content-Type"],
+    allow_headers=["Authorization", "Content-Type", NOME_HEADER_ANTI_CSRF],
 )
 
 app.include_router(routes_auth.router, prefix="/api/auth", tags=["auth"])

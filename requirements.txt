@@ -19,3 +19,7 @@ itsdangerous==2.2.0
 google-genai==2.21.0
 numpy==2.1.3
 pytest==8.3.3
+# Só para tests/test_routes_auth_cookie.py exercitar o transporte de cookie
+# de verdade (fastapi-users exige AsyncSession) -- não é dependência de
+# produção, o driver assíncrono real é asyncmy (acima).
+aiosqlite==0.20.0
