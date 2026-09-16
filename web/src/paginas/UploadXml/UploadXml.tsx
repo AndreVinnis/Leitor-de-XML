@@ -120,6 +120,10 @@ export function UploadXml() {
     setArquivos((atuais) => atuais.filter((_, i) => i !== indice));
   }
 
+  function removerTodosArquivos() {
+    setArquivos([]);
+  }
+
   function handleDrop(evento: DragEvent<HTMLDivElement>) {
     evento.preventDefault();
     setArrastando(false);
@@ -192,6 +196,7 @@ export function UploadXml() {
           <div className={estilos.dropAreaIcone} />
           <span className={estilos.dropAreaTitulo}>Arraste arquivos XML aqui ou clique para selecionar</span>
           <span className={estilos.dropAreaSubtitulo}>Suporta upload em lote de notas fiscais eletrônicas (NF-e)</span>
+          <span className={estilos.dropAreaLimite}>Limite máximo suportado de 500 notas por lote</span>
           <Botao
             type="button"
             variante="secundario"
@@ -206,7 +211,12 @@ export function UploadXml() {
 
         {arquivos.length > 0 && (
           <Card>
-            <h2 className={estilos.tituloSecao}>Arquivos selecionados</h2>
+            <div className={estilos.cabecalhoArquivos}>
+              <h2 className={estilos.tituloSecao}>Arquivos selecionados</h2>
+              <button type="button" className={estilos.botaoRemoverTodos} onClick={removerTodosArquivos}>
+                Remover todos
+              </button>
+            </div>
             <div className={estilos.tabelaArquivos}>
               {arquivos.slice(offsetArquivos, offsetArquivos + ITENS_POR_PAGINA).map((arquivo, indice) => {
                 const indiceReal = offsetArquivos + indice;
