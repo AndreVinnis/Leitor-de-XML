@@ -2,16 +2,13 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
+from app.core.validadores import validar_cnpj_obrigatorio
 
-def _normalizar_cnpj_obrigatorio(valor: str | None) -> str:
-    """Usada tanto na criação quanto na edição de caso: CNPJ é obrigatório
-    nos dois fluxos, então mesmo em ClienteCasoUpdate (campos opcionais para
-    permitir atualização parcial) o valor, quando informado, nunca pode ser
-    vazio/nulo -- não existe "limpar o CNPJ" via PATCH."""
-    digitos = "".join(filter(str.isdigit, valor or ""))
-    if len(digitos) != 14:
-        raise ValueError("CNPJ do cliente é obrigatório e deve ter 14 dígitos.")
-    return digitos
+# Usada tanto na criação quanto na edição de caso: CNPJ é obrigatório nos
+# dois fluxos, então mesmo em ClienteCasoUpdate (campos opcionais para
+# permitir atualização parcial) o valor, quando informado, nunca pode ser
+# vazio/nulo -- não existe "limpar o CNPJ" via PATCH.
+_normalizar_cnpj_obrigatorio = validar_cnpj_obrigatorio
 
 
 class ClienteCasoCreate(BaseModel):

@@ -11,7 +11,7 @@ from app.models.models import (
     Usuario,
 )
 
-CNPJ_CLIENTE = "98765432000188"
+CNPJ_CLIENTE = "11222333000181"
 
 
 def _criar_usuario(session, email="adv@x.com"):
@@ -86,4 +86,30 @@ def test_upload_persiste_lote_e_arquivos_antes_de_enfileirar(
     assert {a.nome_arquivo for a in arquivos_db} == {"nota1.xml", "nota2.xml"}
     assert all(a.status == StatusProcessamento.PENDENTE for a in arquivos_db)
     assert all(a.task_id == "fake-task-id" for a in arquivos_db)
+    session.close()
+
+
+def test_upload_com_cnpj_invalido_retorna_422_e_nao_cria_lote(
+    client, db_session_factory, logar_usuario, monkeypatch
+):
+    fake_processar = MagicMock()
+    monkeypatch.setattr("app.api.routes_upload.processar_xml_nfe", fake_processar)
+
+    session = db_session_factory()
+    usuario = _criar_usuario(session, "adv-upload-cnpj@x.com")
+    caso = _criar_caso(session, "Cliente Upload Inválido")
+    session.close()
+    logar_usuario(usuario)
+
+    arquivos = [("arquivos", ("nota1.xml", BytesIO(b"<a/>"), "text/xml"))]
+    resp = client.post(
+        "/api/notas/upload",
+        data={"cliente_caso_id": caso.id, "cnpj_cliente": "98765432000188"},
+        files=arquivos,
+    )
+    assert resp.status_code == 422
+    fake_processar.delay.assert_not_called()
+
+    session = db_session_factory()
+    assert session.query(Lote).count() == 0
     session.close()

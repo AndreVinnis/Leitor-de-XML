@@ -14,7 +14,7 @@ random.seed(42)
 OUT_DIR = Path(__file__).parent / "fixtures" / "lote_teste_100"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-CLIENTE_CNPJ = "98765432000188"
+CLIENTE_CNPJ = "11444777000161"
 CLIENTE_NOME = "CLIENTE EXEMPLO LTDA"
 
 CONTRAPARTES = [
