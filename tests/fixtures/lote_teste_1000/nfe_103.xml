@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe>
+    <infNFe Id="NFe35260898765432000198550010000001031000001030" versao="4.00">
+      <ide>
+        <nNF>103</nNF>
+        <serie>1</serie>
+        <dhEmi>2026-08-05T07:00:00-03:00</dhEmi>
+      </ide>
+      <emit>
+        <CNPJ>98765432000198</CNPJ>
+        <xNome>CLIENTE EXEMPLO LTDA</xNome>
+      </emit>
+      <dest>
+        <CNPJ>77888999000167</CNPJ>
+        <xNome>COMERCIO ETA LTDA</xNome>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>007</cProd>
+          <xProd>MACARRAO BARILLA 500G</xProd>
+          <NCM>19021900</NCM>
+          <CFOP>5102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>1.0000</qCom>
+          <vUnCom>6.4439</vUnCom>
+          <vProd>6.44</vProd>
+        </prod>
+      </det>
+      <total>
+        <ICMSTot>
+          <vNF>6.44</vNF>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+</nfeProc>

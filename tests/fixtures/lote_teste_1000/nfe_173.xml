@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe>
+    <infNFe Id="NFe35260888999000000148550010000001731000001730" versao="4.00">
+      <ide>
+        <nNF>173</nNF>
+        <serie>1</serie>
+        <dhEmi>2026-08-08T05:00:00-03:00</dhEmi>
+      </ide>
+      <emit>
+        <CNPJ>88999000000148</CNPJ>
+        <xNome>THETA COMERCIO DE ALIMENTOS LTDA</xNome>
+      </emit>
+      <dest>
+        <CNPJ>98765432000198</CNPJ>
+        <xNome>CLIENTE EXEMPLO LTDA</xNome>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>005</cProd>
+          <xProd>CAFE PILAO 500G</xProd>
+          <NCM>09011110</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>9.0000</qCom>
+          <vUnCom>15.1767</vUnCom>
+          <vProd>136.59</vProd>
+        </prod>
+      </det>
+      <det nItem="2">
+        <prod>
+          <cProd>007</cProd>
+          <xProd>MACARRAO BARILLA 500G</xProd>
+          <NCM>19021900</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>3.0000</qCom>
+          <vUnCom>6.8653</vUnCom>
+          <vProd>20.60</vProd>
+        </prod>
+      </det>
+      <total>
+        <ICMSTot>
+          <vNF>157.19</vNF>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+</nfeProc>

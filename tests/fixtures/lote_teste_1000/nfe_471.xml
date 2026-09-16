@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe>
+    <infNFe Id="NFe35260822333444000162550010000004711000004710" versao="4.00">
+      <ide>
+        <nNF>471</nNF>
+        <serie>1</serie>
+        <dhEmi>2026-08-20T15:00:00-03:00</dhEmi>
+      </ide>
+      <emit>
+        <CNPJ>22333444000162</CNPJ>
+        <xNome>ATACADO BETA COMERCIO LTDA</xNome>
+      </emit>
+      <dest>
+        <CNPJ>98765432000198</CNPJ>
+        <xNome>CLIENTE EXEMPLO LTDA</xNome>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>005</cProd>
+          <xProd>CAFE PILAO 500G</xProd>
+          <NCM>09011110</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>5.0000</qCom>
+          <vUnCom>14.2029</vUnCom>
+          <vProd>71.01</vProd>
+        </prod>
+      </det>
+      <det nItem="2">
+        <prod>
+          <cProd>009</cProd>
+          <xProd>MOLHO TOMATE FUGINI 340G</xProd>
+          <NCM>20029000</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>9.0000</qCom>
+          <vUnCom>3.8047</vUnCom>
+          <vProd>34.24</vProd>
+        </prod>
+      </det>
+      <total>
+        <ICMSTot>
+          <vNF>105.25</vNF>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+</nfeProc>

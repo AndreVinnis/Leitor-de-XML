@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe>
+    <infNFe Id="NFe35260888999000000148550010000006131000006130" versao="4.00">
+      <ide>
+        <nNF>613</nNF>
+        <serie>1</serie>
+        <dhEmi>2026-08-26T13:00:00-03:00</dhEmi>
+      </ide>
+      <emit>
+        <CNPJ>88999000000148</CNPJ>
+        <xNome>THETA COMERCIO DE ALIMENTOS LTDA</xNome>
+      </emit>
+      <dest>
+        <CNPJ>98765432000198</CNPJ>
+        <xNome>CLIENTE EXEMPLO LTDA</xNome>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>011</cProd>
+          <xProd>FARINHA DE TRIGO DONA BENTA 1KG</xProd>
+          <NCM>11010010</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>7.0000</qCom>
+          <vUnCom>6.1847</vUnCom>
+          <vProd>43.29</vProd>
+        </prod>
+      </det>
+      <det nItem="2">
+        <prod>
+          <cProd>006</cProd>
+          <xProd>LEITE NINHO INTEGRAL 400G</xProd>
+          <NCM>04022110</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>3.0000</qCom>
+          <vUnCom>21.6598</vUnCom>
+          <vProd>64.98</vProd>
+        </prod>
+      </det>
+      <det nItem="3">
+        <prod>
+          <cProd>003</cProd>
+          <xProd>ACUCAR UNIAO 1KG</xProd>
+          <NCM>17019900</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>4.0000</qCom>
+          <vUnCom>4.9618</vUnCom>
+          <vProd>19.85</vProd>
+        </prod>
+      </det>
+      <total>
+        <ICMSTot>
+          <vNF>128.12</vNF>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+</nfeProc>

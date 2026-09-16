@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe>
+    <infNFe Id="NFe35260898765432000198550010000006321000006320" versao="4.00">
+      <ide>
+        <nNF>632</nNF>
+        <serie>1</serie>
+        <dhEmi>2026-08-27T08:00:00-03:00</dhEmi>
+      </ide>
+      <emit>
+        <CNPJ>98765432000198</CNPJ>
+        <xNome>CLIENTE EXEMPLO LTDA</xNome>
+      </emit>
+      <dest>
+        <CNPJ>22333444000162</CNPJ>
+        <xNome>ATACADO BETA COMERCIO LTDA</xNome>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>005</cProd>
+          <xProd>CAFE PILAO 500G</xProd>
+          <NCM>09011110</NCM>
+          <CFOP>5102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>21.0000</qCom>
+          <vUnCom>15.5028</vUnCom>
+          <vProd>325.56</vProd>
+        </prod>
+      </det>
+      <det nItem="2">
+        <prod>
+          <cProd>006</cProd>
+          <xProd>LEITE NINHO INTEGRAL 400G</xProd>
+          <NCM>04022110</NCM>
+          <CFOP>5102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>10.0000</qCom>
+          <vUnCom>21.3537</vUnCom>
+          <vProd>213.54</vProd>
+        </prod>
+      </det>
+      <det nItem="3">
+        <prod>
+          <cProd>009</cProd>
+          <xProd>MOLHO TOMATE FUGINI 340G</xProd>
+          <NCM>20029000</NCM>
+          <CFOP>5102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>17.0000</qCom>
+          <vUnCom>3.6464</vUnCom>
+          <vProd>61.99</vProd>
+        </prod>
+      </det>
+      <total>
+        <ICMSTot>
+          <vNF>601.09</vNF>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+</nfeProc>

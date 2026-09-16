@@ -3,7 +3,7 @@ Gera um lote de XMLs de NF-e sintéticos para teste de carga do upload
 (não são notas reais nem de nenhum ambiente da SEFAZ).
 
 Uso: python3 tests/gerar_lote_teste.py
-Gera 100 arquivos em tests/fixtures/lote_teste_100/
+Gera 1000 arquivos em tests/fixtures/lote_teste_1000/
 """
 import random
 from datetime import datetime, timedelta
@@ -11,10 +11,10 @@ from pathlib import Path
 
 random.seed(42)
 
-OUT_DIR = Path(__file__).parent / "fixtures" / "lote_teste_100"
+OUT_DIR = Path(__file__).parent / "fixtures" / "lote_teste_1000"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-CLIENTE_CNPJ = "11444777000161"
+CLIENTE_CNPJ = "98765432000198"
 CLIENTE_NOME = "CLIENTE EXEMPLO LTDA"
 
 CONTRAPARTES = [
@@ -148,11 +148,11 @@ def gerar_nota(seq: int, dt_base: datetime) -> str:
 
 def main():
     dt_base = datetime(2026, 8, 1)
-    for seq in range(1, 101):
+    for seq in range(1, 1001):
         xml_content = gerar_nota(seq, dt_base)
         destino = OUT_DIR / f"nfe_{seq:03d}.xml"
         destino.write_text(xml_content, encoding="utf-8")
-    print(f"Gerados 100 arquivos em: {OUT_DIR}")
+    print(f"Gerados 1000 arquivos em: {OUT_DIR}")
     print(f"CNPJ do cliente a usar no campo 'cnpj_cliente' do upload: {CLIENTE_CNPJ}")
 
 

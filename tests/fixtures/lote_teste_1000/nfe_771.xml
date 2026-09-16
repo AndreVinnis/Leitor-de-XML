@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe>
+    <infNFe Id="NFe35260822333444000162550010000007711000007710" versao="4.00">
+      <ide>
+        <nNF>771</nNF>
+        <serie>1</serie>
+        <dhEmi>2026-09-02T03:00:00-03:00</dhEmi>
+      </ide>
+      <emit>
+        <CNPJ>22333444000162</CNPJ>
+        <xNome>ATACADO BETA COMERCIO LTDA</xNome>
+      </emit>
+      <dest>
+        <CNPJ>98765432000198</CNPJ>
+        <xNome>CLIENTE EXEMPLO LTDA</xNome>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>004</cProd>
+          <xProd>OLEO SOJA LIZA 900ML</xProd>
+          <NCM>15071000</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>3.0000</qCom>
+          <vUnCom>10.1643</vUnCom>
+          <vProd>30.49</vProd>
+        </prod>
+      </det>
+      <det nItem="2">
+        <prod>
+          <cProd>010</cProd>
+          <xProd>SAL REFINADO CISNE 1KG</xProd>
+          <NCM>25010020</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>1.0000</qCom>
+          <vUnCom>2.7892</vUnCom>
+          <vProd>2.79</vProd>
+        </prod>
+      </det>
+      <det nItem="3">
+        <prod>
+          <cProd>012</cProd>
+          <xProd>BISCOITO MAIZENA PIRAQUE 200G</xProd>
+          <NCM>19053100</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>5.0000</qCom>
+          <vUnCom>5.1520</vUnCom>
+          <vProd>25.76</vProd>
+        </prod>
+      </det>
+      <total>
+        <ICMSTot>
+          <vNF>59.04</vNF>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+</nfeProc>

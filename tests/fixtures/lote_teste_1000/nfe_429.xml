@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe>
+    <infNFe Id="NFe35260822333444000162550010000004291000004290" versao="4.00">
+      <ide>
+        <nNF>429</nNF>
+        <serie>1</serie>
+        <dhEmi>2026-08-18T21:00:00-03:00</dhEmi>
+      </ide>
+      <emit>
+        <CNPJ>22333444000162</CNPJ>
+        <xNome>ATACADO BETA COMERCIO LTDA</xNome>
+      </emit>
+      <dest>
+        <CNPJ>98765432000198</CNPJ>
+        <xNome>CLIENTE EXEMPLO LTDA</xNome>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>001</cProd>
+          <xProd>ARROZ TIO JOAO 5KG</xProd>
+          <NCM>10063021</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>7.0000</qCom>
+          <vUnCom>25.6979</vUnCom>
+          <vProd>179.89</vProd>
+        </prod>
+      </det>
+      <det nItem="2">
+        <prod>
+          <cProd>012</cProd>
+          <xProd>BISCOITO MAIZENA PIRAQUE 200G</xProd>
+          <NCM>19053100</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>2.0000</qCom>
+          <vUnCom>4.9015</vUnCom>
+          <vProd>9.80</vProd>
+        </prod>
+      </det>
+      <det nItem="3">
+        <prod>
+          <cProd>002</cProd>
+          <xProd>FEIJAO CARIOCA 1KG</xProd>
+          <NCM>07133399</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>8.0000</qCom>
+          <vUnCom>8.3299</vUnCom>
+          <vProd>66.64</vProd>
+        </prod>
+      </det>
+      <total>
+        <ICMSTot>
+          <vNF>256.33</vNF>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+</nfeProc>

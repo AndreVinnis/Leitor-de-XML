@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe>
+    <infNFe Id="NFe35260833444555000143550010000008691000008690" versao="4.00">
+      <ide>
+        <nNF>869</nNF>
+        <serie>1</serie>
+        <dhEmi>2026-09-06T05:00:00-03:00</dhEmi>
+      </ide>
+      <emit>
+        <CNPJ>33444555000143</CNPJ>
+        <xNome>MERCADO GAMA SUPERMERCADOS LTDA</xNome>
+      </emit>
+      <dest>
+        <CNPJ>98765432000198</CNPJ>
+        <xNome>CLIENTE EXEMPLO LTDA</xNome>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>005</cProd>
+          <xProd>CAFE PILAO 500G</xProd>
+          <NCM>09011110</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>8.0000</qCom>
+          <vUnCom>15.5740</vUnCom>
+          <vProd>124.59</vProd>
+        </prod>
+      </det>
+      <det nItem="2">
+        <prod>
+          <cProd>008</cProd>
+          <xProd>SARDINHA COQUEIRO LATA 125G</xProd>
+          <NCM>16041300</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>2.0000</qCom>
+          <vUnCom>4.1713</vUnCom>
+          <vProd>8.34</vProd>
+        </prod>
+      </det>
+      <det nItem="3">
+        <prod>
+          <cProd>009</cProd>
+          <xProd>MOLHO TOMATE FUGINI 340G</xProd>
+          <NCM>20029000</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>6.0000</qCom>
+          <vUnCom>3.5766</vUnCom>
+          <vProd>21.46</vProd>
+        </prod>
+      </det>
+      <total>
+        <ICMSTot>
+          <vNF>154.39</vNF>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+</nfeProc>

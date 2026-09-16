@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe>
+    <infNFe Id="NFe35260844555666000124550010000007151000007150" versao="4.00">
+      <ide>
+        <nNF>715</nNF>
+        <serie>1</serie>
+        <dhEmi>2026-08-30T19:00:00-03:00</dhEmi>
+      </ide>
+      <emit>
+        <CNPJ>44555666000124</CNPJ>
+        <xNome>COMERCIAL DELTA EIRELI</xNome>
+      </emit>
+      <dest>
+        <CNPJ>98765432000198</CNPJ>
+        <xNome>CLIENTE EXEMPLO LTDA</xNome>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>011</cProd>
+          <xProd>FARINHA DE TRIGO DONA BENTA 1KG</xProd>
+          <NCM>11010010</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>4.0000</qCom>
+          <vUnCom>6.0142</vUnCom>
+          <vProd>24.06</vProd>
+        </prod>
+      </det>
+      <det nItem="2">
+        <prod>
+          <cProd>012</cProd>
+          <xProd>BISCOITO MAIZENA PIRAQUE 200G</xProd>
+          <NCM>19053100</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>4.0000</qCom>
+          <vUnCom>4.6303</vUnCom>
+          <vProd>18.52</vProd>
+        </prod>
+      </det>
+      <total>
+        <ICMSTot>
+          <vNF>42.58</vNF>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+</nfeProc>

@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe>
+    <infNFe Id="NFe35260898765432000198550010000005201000005200" versao="4.00">
+      <ide>
+        <nNF>520</nNF>
+        <serie>1</serie>
+        <dhEmi>2026-08-22T16:00:00-03:00</dhEmi>
+      </ide>
+      <emit>
+        <CNPJ>98765432000198</CNPJ>
+        <xNome>CLIENTE EXEMPLO LTDA</xNome>
+      </emit>
+      <dest>
+        <CNPJ>55666777000105</CNPJ>
+        <xNome>EPSILON DISTRIBUIDORA S.A.</xNome>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>002</cProd>
+          <xProd>FEIJAO CARIOCA 1KG</xProd>
+          <NCM>07133399</NCM>
+          <CFOP>5102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>5.0000</qCom>
+          <vUnCom>8.5112</vUnCom>
+          <vProd>42.56</vProd>
+        </prod>
+      </det>
+      <det nItem="2">
+        <prod>
+          <cProd>009</cProd>
+          <xProd>MOLHO TOMATE FUGINI 340G</xProd>
+          <NCM>20029000</NCM>
+          <CFOP>5102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>23.0000</qCom>
+          <vUnCom>3.7449</vUnCom>
+          <vProd>86.13</vProd>
+        </prod>
+      </det>
+      <total>
+        <ICMSTot>
+          <vNF>128.69</vNF>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+</nfeProc>

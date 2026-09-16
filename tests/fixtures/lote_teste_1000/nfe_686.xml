@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe>
+    <infNFe Id="NFe35260844555666000124550010000006861000006860" versao="4.00">
+      <ide>
+        <nNF>686</nNF>
+        <serie>1</serie>
+        <dhEmi>2026-08-29T14:00:00-03:00</dhEmi>
+      </ide>
+      <emit>
+        <CNPJ>44555666000124</CNPJ>
+        <xNome>COMERCIAL DELTA EIRELI</xNome>
+      </emit>
+      <dest>
+        <CNPJ>98765432000198</CNPJ>
+        <xNome>CLIENTE EXEMPLO LTDA</xNome>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>011</cProd>
+          <xProd>FARINHA DE TRIGO DONA BENTA 1KG</xProd>
+          <NCM>11010010</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>9.0000</qCom>
+          <vUnCom>6.0626</vUnCom>
+          <vProd>54.56</vProd>
+        </prod>
+      </det>
+      <det nItem="2">
+        <prod>
+          <cProd>010</cProd>
+          <xProd>SAL REFINADO CISNE 1KG</xProd>
+          <NCM>25010020</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>3.0000</qCom>
+          <vUnCom>2.8731</vUnCom>
+          <vProd>8.62</vProd>
+        </prod>
+      </det>
+      <det nItem="3">
+        <prod>
+          <cProd>004</cProd>
+          <xProd>OLEO SOJA LIZA 900ML</xProd>
+          <NCM>15071000</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>1.0000</qCom>
+          <vUnCom>10.1671</vUnCom>
+          <vProd>10.17</vProd>
+        </prod>
+      </det>
+      <total>
+        <ICMSTot>
+          <vNF>73.35</vNF>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+</nfeProc>

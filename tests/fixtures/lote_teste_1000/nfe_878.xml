@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe>
+    <infNFe Id="NFe35260898765432000198550010000008781000008780" versao="4.00">
+      <ide>
+        <nNF>878</nNF>
+        <serie>1</serie>
+        <dhEmi>2026-09-06T14:00:00-03:00</dhEmi>
+      </ide>
+      <emit>
+        <CNPJ>98765432000198</CNPJ>
+        <xNome>CLIENTE EXEMPLO LTDA</xNome>
+      </emit>
+      <dest>
+        <CNPJ>33444555000143</CNPJ>
+        <xNome>MERCADO GAMA SUPERMERCADOS LTDA</xNome>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>009</cProd>
+          <xProd>MOLHO TOMATE FUGINI 340G</xProd>
+          <NCM>20029000</NCM>
+          <CFOP>5102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>24.0000</qCom>
+          <vUnCom>3.6640</vUnCom>
+          <vProd>87.94</vProd>
+        </prod>
+      </det>
+      <det nItem="2">
+        <prod>
+          <cProd>005</cProd>
+          <xProd>CAFE PILAO 500G</xProd>
+          <NCM>09011110</NCM>
+          <CFOP>5102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>15.0000</qCom>
+          <vUnCom>14.2090</vUnCom>
+          <vProd>213.13</vProd>
+        </prod>
+      </det>
+      <det nItem="3">
+        <prod>
+          <cProd>004</cProd>
+          <xProd>OLEO SOJA LIZA 900ML</xProd>
+          <NCM>15071000</NCM>
+          <CFOP>5102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>9.0000</qCom>
+          <vUnCom>10.0648</vUnCom>
+          <vProd>90.58</vProd>
+        </prod>
+      </det>
+      <total>
+        <ICMSTot>
+          <vNF>391.65</vNF>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+</nfeProc>

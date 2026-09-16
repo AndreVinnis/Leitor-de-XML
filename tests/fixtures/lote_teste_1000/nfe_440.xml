@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe>
+    <infNFe Id="NFe35260833444555000143550010000004401000004400" versao="4.00">
+      <ide>
+        <nNF>440</nNF>
+        <serie>1</serie>
+        <dhEmi>2026-08-19T08:00:00-03:00</dhEmi>
+      </ide>
+      <emit>
+        <CNPJ>33444555000143</CNPJ>
+        <xNome>MERCADO GAMA SUPERMERCADOS LTDA</xNome>
+      </emit>
+      <dest>
+        <CNPJ>98765432000198</CNPJ>
+        <xNome>CLIENTE EXEMPLO LTDA</xNome>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>003</cProd>
+          <xProd>ACUCAR UNIAO 1KG</xProd>
+          <NCM>17019900</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>1.0000</qCom>
+          <vUnCom>5.6035</vUnCom>
+          <vProd>5.60</vProd>
+        </prod>
+      </det>
+      <total>
+        <ICMSTot>
+          <vNF>5.60</vNF>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+</nfeProc>

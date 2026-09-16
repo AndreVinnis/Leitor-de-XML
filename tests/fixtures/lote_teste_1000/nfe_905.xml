@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe>
+    <infNFe Id="NFe35260866777888000186550010000009051000009050" versao="4.00">
+      <ide>
+        <nNF>905</nNF>
+        <serie>1</serie>
+        <dhEmi>2026-09-07T17:00:00-03:00</dhEmi>
+      </ide>
+      <emit>
+        <CNPJ>66777888000186</CNPJ>
+        <xNome>ZETA ATACADISTA LTDA</xNome>
+      </emit>
+      <dest>
+        <CNPJ>98765432000198</CNPJ>
+        <xNome>CLIENTE EXEMPLO LTDA</xNome>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>003</cProd>
+          <xProd>ACUCAR UNIAO 1KG</xProd>
+          <NCM>17019900</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>7.0000</qCom>
+          <vUnCom>5.5899</vUnCom>
+          <vProd>39.13</vProd>
+        </prod>
+      </det>
+      <det nItem="2">
+        <prod>
+          <cProd>004</cProd>
+          <xProd>OLEO SOJA LIZA 900ML</xProd>
+          <NCM>15071000</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>9.0000</qCom>
+          <vUnCom>9.8855</vUnCom>
+          <vProd>88.97</vProd>
+        </prod>
+      </det>
+      <det nItem="3">
+        <prod>
+          <cProd>009</cProd>
+          <xProd>MOLHO TOMATE FUGINI 340G</xProd>
+          <NCM>20029000</NCM>
+          <CFOP>1102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>1.0000</qCom>
+          <vUnCom>3.8003</vUnCom>
+          <vProd>3.80</vProd>
+        </prod>
+      </det>
+      <total>
+        <ICMSTot>
+          <vNF>131.90</vNF>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+</nfeProc>

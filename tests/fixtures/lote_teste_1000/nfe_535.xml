@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe>
+    <infNFe Id="NFe35260898765432000198550010000005351000005350" versao="4.00">
+      <ide>
+        <nNF>535</nNF>
+        <serie>1</serie>
+        <dhEmi>2026-08-23T07:00:00-03:00</dhEmi>
+      </ide>
+      <emit>
+        <CNPJ>98765432000198</CNPJ>
+        <xNome>CLIENTE EXEMPLO LTDA</xNome>
+      </emit>
+      <dest>
+        <CNPJ>77888999000167</CNPJ>
+        <xNome>COMERCIO ETA LTDA</xNome>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>003</cProd>
+          <xProd>ACUCAR UNIAO 1KG</xProd>
+          <NCM>17019900</NCM>
+          <CFOP>5102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>9.0000</qCom>
+          <vUnCom>5.3010</vUnCom>
+          <vProd>47.71</vProd>
+        </prod>
+      </det>
+      <det nItem="2">
+        <prod>
+          <cProd>011</cProd>
+          <xProd>FARINHA DE TRIGO DONA BENTA 1KG</xProd>
+          <NCM>11010010</NCM>
+          <CFOP>5102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>6.0000</qCom>
+          <vUnCom>6.4178</vUnCom>
+          <vProd>38.51</vProd>
+        </prod>
+      </det>
+      <total>
+        <ICMSTot>
+          <vNF>86.22</vNF>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+</nfeProc>
