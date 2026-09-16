@@ -16,9 +16,11 @@ router = APIRouter()
 UPLOAD_DIR = Path("/tmp/nfe_uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+LIMITE_ARQUIVOS_POR_LOTE = 500
+
 
 @router.post("/upload")
-async def upload_notas(
+def upload_notas(
     cliente_caso_id: int = Form(...),
     cnpj_cliente: str = Form(...),
     arquivos: list[UploadFile] = File(...),
@@ -32,7 +34,22 @@ async def upload_notas(
     Persiste o Lote e um ArquivoLote por arquivo ANTES de enfileirar as
     tasks -- sem isso, os cards do dashboard e o badge de status por nota
     não têm fonte de dados (o estado do Celery é efêmero).
+
+    Handler síncrono (não `async def`) de propósito: todo o corpo é I/O
+    bloqueante (disco, banco, broker), e um `async def` bloqueante trava a
+    única event loop do processo (`uvicorn` roda sem `--workers`) para todo
+    mundo, não só para quem fez o upload. `def` faz o FastAPI rodar isso
+    numa thread do threadpool automaticamente.
     """
+    if len(arquivos) > LIMITE_ARQUIVOS_POR_LOTE:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Lote excede o máximo de {LIMITE_ARQUIVOS_POR_LOTE} arquivos "
+                "por upload. Divida em lotes menores."
+            ),
+        )
+
     try:
         cnpj_cliente = validar_cnpj_obrigatorio(cnpj_cliente)
     except ValueError as exc:

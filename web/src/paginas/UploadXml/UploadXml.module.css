@@ -79,11 +79,32 @@
   color: var(--cor-texto-secundario);
 }
 
+.dropAreaLimite {
+  font-size: 12px;
+  color: var(--cor-texto-secundario);
+}
+
 .tituloSecao {
   font-size: 17px;
   font-weight: 700;
   color: var(--cor-texto);
   margin: 0;
+}
+
+.cabecalhoArquivos {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.botaoRemoverTodos {
+  border: none;
+  background: none;
+  color: var(--cor-erro);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
 }
 
 .tabelaArquivos {

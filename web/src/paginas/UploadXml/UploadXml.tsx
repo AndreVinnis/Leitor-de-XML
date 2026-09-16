@@ -60,6 +60,12 @@ export function UploadXml() {
   const { notificar } = useToast();
 
   const [arquivos, setArquivos] = useState<File[]>([]);
+  // Muda a cada seleção para forçar o React a remontar o <input type="file">
+  // com um nó DOM novo a cada abertura do diálogo nativo -- reaproveitar o
+  // mesmo input entre seleções (só resetando `.value`) deixava a segunda
+  // abertura do diálogo "morta" em alguns ambientes (ex: antivírus que
+  // intercepta o diálogo de arquivo), sem disparar onChange de novo.
+  const [inputKey, setInputKey] = useState(0);
   const [offsetArquivos, setOffsetArquivos] = useState(0);
   const [loteId, setLoteId] = useState<string | null>(null);
   const [offsetProgresso, setOffsetProgresso] = useState(0);
@@ -118,6 +124,10 @@ export function UploadXml() {
 
   function removerArquivo(indice: number) {
     setArquivos((atuais) => atuais.filter((_, i) => i !== indice));
+  }
+
+  function removerTodosArquivos() {
+    setArquivos([]);
   }
 
   function handleDrop(evento: DragEvent<HTMLDivElement>) {
@@ -179,6 +189,7 @@ export function UploadXml() {
           onDrop={handleDrop}
         >
           <input
+            key={inputKey}
             ref={inputArquivosRef}
             type="file"
             accept=".xml"
@@ -186,12 +197,13 @@ export function UploadXml() {
             className={estilos.inputArquivos}
             onChange={(evento) => {
               adicionarArquivos(evento.target.files);
-              evento.target.value = "";
+              setInputKey((atual) => atual + 1);
             }}
           />
           <div className={estilos.dropAreaIcone} />
           <span className={estilos.dropAreaTitulo}>Arraste arquivos XML aqui ou clique para selecionar</span>
           <span className={estilos.dropAreaSubtitulo}>Suporta upload em lote de notas fiscais eletrônicas (NF-e)</span>
+          <span className={estilos.dropAreaLimite}>Limite máximo suportado de 500 notas por lote</span>
           <Botao
             type="button"
             variante="secundario"
@@ -206,7 +218,12 @@ export function UploadXml() {
 
         {arquivos.length > 0 && (
           <Card>
-            <h2 className={estilos.tituloSecao}>Arquivos selecionados</h2>
+            <div className={estilos.cabecalhoArquivos}>
+              <h2 className={estilos.tituloSecao}>Arquivos selecionados</h2>
+              <button type="button" className={estilos.botaoRemoverTodos} onClick={removerTodosArquivos}>
+                Remover todos
+              </button>
+            </div>
             <div className={estilos.tabelaArquivos}>
               {arquivos.slice(offsetArquivos, offsetArquivos + ITENS_POR_PAGINA).map((arquivo, indice) => {
                 const indiceReal = offsetArquivos + indice;
