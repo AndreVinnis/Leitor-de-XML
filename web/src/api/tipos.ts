@@ -18,11 +18,6 @@ export interface UsuarioLogado {
   is_verified: boolean;
 }
 
-export interface LoginResposta {
-  access_token: string;
-  token_type: string;
-}
-
 export interface ClienteCaso {
   id: number;
   nome_cliente: string;

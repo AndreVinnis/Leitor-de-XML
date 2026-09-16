@@ -23,6 +23,15 @@ class Settings(BaseSettings):
     # servidor), mas o frontend React em web/ roda no browser do host.
     cors_origins: str = "http://localhost:5173"
 
+    # Cookie de sessão do frontend React (CookieTransport em app/core/auth.py).
+    # cookie_secure só é True atrás de https -- em dev http (mesmo com proxy
+    # same-origin) o browser descarta um cookie Secure sem avisar, e todo
+    # request autenticado vira 401 silencioso. Nunca ligar por default
+    # implícito, só via .env quando o ambiente for https de verdade.
+    cookie_secure: bool = False
+    cookie_samesite: str = "lax"
+    cookie_max_age_segundos: int = 3600
+
     smtp_host: str = "localhost"
     smtp_port: int = 1025
     smtp_user: str = ""

@@ -15,4 +15,10 @@ celery_app.conf.update(
     result_serializer="json",
     timezone="America/Sao_Paulo",
     enable_utc=True,
+    # Evita que um worker prenda várias mensagens pré-buscadas que ficariam
+    # travadas até o visibility_timeout se ele morrer no meio de uma delas.
+    worker_prefetch_multiplier=1,
+    # Redelivery mais rápido em caso de crash do worker (default do Redis é
+    # 3600s) -- compatível com o tempo esperado de processar um XML/lote.
+    broker_transport_options={"visibility_timeout": 1800},
 )

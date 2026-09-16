@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { login as loginApi, obterUsuarioLogado } from "../api/auth";
+import { login as loginApi, logout as logoutApi, obterUsuarioLogado } from "../api/auth";
 import { registrarCallbackSessaoExpirada } from "../api/cliente";
 import type { UsuarioLogado } from "../api/tipos";
 
@@ -7,7 +7,7 @@ interface ContextoAuthValor {
   usuario: UsuarioLogado | null;
   carregando: boolean;
   entrar: (email: string, senha: string) => Promise<void>;
-  sair: () => void;
+  sair: () => Promise<void>;
   /** Atualiza o usuário armazenado (sessionStorage + contexto) após uma edição de perfil bem-sucedida. */
   atualizarUsuario: (usuario: UsuarioLogado) => void;
 }
@@ -28,16 +28,19 @@ export function ProvedorAuth({ children }: { children: ReactNode }) {
   const [carregando, setCarregando] = useState(false);
 
   useEffect(() => {
-    // O JWT dura 3600s (app/core/auth.py) e não há refresh token, então
-    // expirar é o caminho normal, não uma excecão -- tratado num lugar só.
+    // Sessão por cookie HttpOnly, deslizante (app/core/sessao_deslizante.py)
+    // -- o servidor reemite o cookie sozinho enquanto o uso continuar, então
+    // 401 só acontece se a sessão ficar de fato ociosa além da vida do
+    // cookie, ou o servidor invalidar por outro motivo. Tratado num lugar só.
     registrarCallbackSessaoExpirada(() => setUsuario(null));
   }, []);
 
   async function entrar(email: string, senha: string) {
     setCarregando(true);
     try {
-      const resposta = await loginApi(email, senha);
-      sessionStorage.setItem("token", resposta.access_token);
+      // login() não devolve token -- a resposta é 204 e o cookie HttpOnly
+      // de sessão vem no Set-Cookie, que o JS nunca lê.
+      await loginApi(email, senha);
       const usuarioLogado = await obterUsuarioLogado();
       sessionStorage.setItem("usuario", JSON.stringify(usuarioLogado));
       setUsuario(usuarioLogado);
@@ -46,12 +49,16 @@ export function ProvedorAuth({ children }: { children: ReactNode }) {
     }
   }
 
-  function sair() {
-    // POST /api/auth/jwt/logout é um 204 no-op (JWT stateless não tem o
-    // que revogar no servidor) -- sair é só limpar o lado do cliente.
-    sessionStorage.removeItem("token");
-    sessionStorage.removeItem("usuario");
-    setUsuario(null);
+  async function sair() {
+    try {
+      await logoutApi();
+    } catch {
+      // Mesmo se a chamada falhar (rede, sessão já expirada), garante que o
+      // estado local seja limpo -- não trava o usuário na tela.
+    } finally {
+      sessionStorage.removeItem("usuario");
+      setUsuario(null);
+    }
   }
 
   function atualizarUsuario(usuarioAtualizado: UsuarioLogado) {

@@ -32,24 +32,19 @@ TOP_K_CANDIDATOS = 15
 MAX_CANDIDATOS_POR_LOTE = 150
 
 
-def _atualizar_status_arquivo_lote(db, arquivo_lote_id: int, resultado: dict | None) -> None:
+def _atualizar_status_arquivo_lote(db, arquivo_lote_id: int, resultado: dict) -> None:
     """
-    Grava o desfecho do processamento na linha ArquivoLote correspondente.
-    Chamada a partir do `finally` de processar_xml_nfe -- precisa rodar
-    inclusive nos caminhos de exceção, já que um XML que falha no parser
-    nunca vira uma Nota, mas o registro do erro precisa existir do mesmo
-    jeito (é o que alimenta o badge de status por nota e os cards do
-    dashboard).
+    Grava o desfecho terminal do processamento na linha ArquivoLote
+    correspondente. Chamada a partir do `finally` de processar_xml_nfe só
+    quando há de fato um resultado terminal (sucesso, duplicado ou erro sem
+    mais tentativas) -- uma exceção que ainda vai ser retentada não passa por
+    aqui, para não sobrescrever o PROCESSANDO com um ERRO prematuro.
     """
     arquivo_lote = db.get(ArquivoLote, arquivo_lote_id)
     if arquivo_lote is None:
         return  # não deveria acontecer, mas não é motivo para derrubar a task
 
-    if resultado is None:
-        # exceção ocorreu antes de qualquer resultado ser montado
-        arquivo_lote.status = StatusProcessamento.ERRO
-        arquivo_lote.motivo_erro = "falha inesperada antes de produzir um resultado"
-    elif resultado["status"] == "ok":
+    if resultado["status"] == "ok":
         arquivo_lote.status = StatusProcessamento.SUCESSO
         arquivo_lote.nota_id = resultado.get("nota_id")
     elif resultado["status"] == "ja_existente":
@@ -61,9 +56,31 @@ def _atualizar_status_arquivo_lote(db, arquivo_lote_id: int, resultado: dict | N
     db.commit()
 
 
-@celery_app.task(name="processar_xml_nfe")
+def _marcar_processando(db, arquivo_lote_id: int) -> None:
+    """
+    Marca o início do processamento com commit imediato, antes de qualquer
+    trabalho de fato. Separa "nunca foi processado" (PENDENTE) de "começou e
+    morreu no meio" (PROCESSANDO sem nunca virar um status terminal) -- antes
+    os dois casos eram indistinguíveis se o worker morresse (kill -9/OOM)
+    durante o processamento, e o ArquivoLote ficava preso em PENDENTE para
+    sempre.
+    """
+    arquivo_lote = db.get(ArquivoLote, arquivo_lote_id)
+    if arquivo_lote is None:
+        return
+    arquivo_lote.status = StatusProcessamento.PROCESSANDO
+    db.commit()
+
+
+@celery_app.task(
+    name="processar_xml_nfe",
+    bind=True,
+    acks_late=True,
+    reject_on_worker_lost=True,
+    max_retries=3,
+)
 def processar_xml_nfe(
-    caminho_arquivo: str, cnpj_cliente: str, cliente_caso_id: int, arquivo_lote_id: int
+    self, caminho_arquivo: str, cnpj_cliente: str, cliente_caso_id: int, arquivo_lote_id: int
 ) -> dict:
     """
     Processa um único arquivo XML de NF-e:
@@ -73,10 +90,17 @@ def processar_xml_nfe(
        isso acontece em uma etapa posterior, assíncrona também).
     4. Atualiza o ArquivoLote correspondente (criado antes do enfileiramento,
        em routes_upload.py) com o desfecho do processamento.
+
+    acks_late+reject_on_worker_lost: se o worker morrer no meio, a mensagem
+    volta pra fila e outra execução tenta de novo -- seguro porque
+    chave_acesso é UNIQUE e a checagem de `existente` abaixo já trata
+    reprocessamento do mesmo arquivo sem duplicar Nota/ItemNota.
     """
     db = SessionLocal()
     resultado: dict | None = None
     try:
+        _marcar_processando(db, arquivo_lote_id)
+
         nota_dto = parse_nfe_xml(caminho_arquivo)
         tipo = classificar_tipo(nota_dto, cnpj_cliente)
 
@@ -128,15 +152,25 @@ def processar_xml_nfe(
         return resultado
 
     except NFeParseError as exc:
+        # Determinístico -- reprocessar um XML malformado não muda o
+        # resultado, então não passa pelo retry abaixo.
         db.rollback()
         resultado = {"status": "erro", "arquivo": caminho_arquivo, "motivo": str(exc)}
         return resultado
     except Exception as exc:  # noqa: BLE001
         db.rollback()
+        # Possivelmente transitório (banco, IO): tenta de novo antes de
+        # desistir. Enquanto ainda há tentativas, `resultado` fica None de
+        # propósito -- o finally abaixo só grava status terminal quando há
+        # um resultado, então uma tentativa que vai se repetir não marca
+        # ERRO prematuramente por cima do PROCESSANDO.
+        if self.request.retries < self.max_retries:
+            raise self.retry(exc=exc, countdown=30) from exc
         resultado = {"status": "erro_inesperado", "arquivo": caminho_arquivo, "motivo": str(exc)}
         return resultado
     finally:
-        _atualizar_status_arquivo_lote(db, arquivo_lote_id, resultado)
+        if resultado is not None:
+            _atualizar_status_arquivo_lote(db, arquivo_lote_id, resultado)
         db.close()
 
 

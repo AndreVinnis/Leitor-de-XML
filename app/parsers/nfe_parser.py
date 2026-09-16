@@ -26,6 +26,17 @@ from lxml import etree
 # Namespace padrão da NF-e (varia pouco entre versões/estados)
 NFE_NS = {"nfe": "http://www.portalfiscal.inf.br/nfe"}
 
+# Defesa em profundidade contra XXE: desliga resolução de entidade externa,
+# acesso de rede e DTD, mesmo que o default do lxml já bloqueie a maior parte
+# disso -- não depender só do default da biblioteca.
+_XML_PARSER = etree.XMLParser(
+    resolve_entities=False,
+    no_network=True,
+    dtd_validation=False,
+    load_dtd=False,
+    huge_tree=False,
+)
+
 
 class NFeParseError(Exception):
     """Erro ao processar um XML de NF-e (arquivo malformado, schema inesperado etc.)."""
@@ -92,7 +103,7 @@ def parse_nfe_xml(xml_path: str | Path) -> NotaNFeDTO:
     """
     xml_path = Path(xml_path)
     try:
-        tree = etree.parse(str(xml_path))
+        tree = etree.parse(str(xml_path), parser=_XML_PARSER)
     except etree.XMLSyntaxError as exc:
         raise NFeParseError(f"XML malformado em {xml_path.name}: {exc}") from exc
 

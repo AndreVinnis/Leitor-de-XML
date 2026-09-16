@@ -2,7 +2,12 @@ from typing import AsyncGenerator, Optional
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi_users import BaseUserManager, FastAPIUsers, IntegerIDMixin
-from fastapi_users.authentication import AuthenticationBackend, BearerTransport, JWTStrategy
+from fastapi_users.authentication import (
+    AuthenticationBackend,
+    BearerTransport,
+    CookieTransport,
+    JWTStrategy,
+)
 from fastapi_users.db import SQLAlchemyUserDatabase
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -43,11 +48,30 @@ async def get_user_manager(
     yield UserManager(user_db)
 
 
+# Bearer no header, sem cookie -- usado pelo Streamlit (frontend/api_client.py)
+# e pelos testes. O frontend React (web/) migrou para cookie_backend, abaixo.
 bearer_transport = BearerTransport(tokenUrl="api/auth/jwt/login")
+
+# Nome do cookie de sessão do frontend React -- compartilhado com
+# app/core/csrf.py e app/core/sessao_deslizante.py (que precisam saber se
+# uma requisição carrega este cookie, sem reimportar todo este módulo).
+NOME_COOKIE_SESSAO = "sessao_nfe"
+
+cookie_transport = CookieTransport(
+    cookie_name=NOME_COOKIE_SESSAO,
+    cookie_max_age=settings.cookie_max_age_segundos,
+    cookie_secure=settings.cookie_secure,
+    cookie_httponly=True,
+    cookie_samesite=settings.cookie_samesite,
+)
 
 
 def get_jwt_strategy() -> JWTStrategy:
     return JWTStrategy(secret=settings.secret_key, lifetime_seconds=3600)
+
+
+def get_cookie_jwt_strategy() -> JWTStrategy:
+    return JWTStrategy(secret=settings.secret_key, lifetime_seconds=settings.cookie_max_age_segundos)
 
 
 auth_backend = AuthenticationBackend(
@@ -56,7 +80,13 @@ auth_backend = AuthenticationBackend(
     get_strategy=get_jwt_strategy,
 )
 
-fastapi_users = FastAPIUsers[Usuario, int](get_user_manager, [auth_backend])
+cookie_backend = AuthenticationBackend(
+    name="cookie",
+    transport=cookie_transport,
+    get_strategy=get_cookie_jwt_strategy,
+)
+
+fastapi_users = FastAPIUsers[Usuario, int](get_user_manager, [auth_backend, cookie_backend])
 
 usuario_atual_ativo = fastapi_users.current_user(active=True)
 
