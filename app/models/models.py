@@ -183,6 +183,7 @@ class ClienteCaso(Base):
 
 class StatusProcessamento(str, Enum):
     PENDENTE = "pendente"
+    PROCESSANDO = "processando"
     SUCESSO = "sucesso"
     ERRO = "erro"
     DUPLICADO = "duplicado"
