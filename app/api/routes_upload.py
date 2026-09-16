@@ -2,11 +2,12 @@ import shutil
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.auth import usuario_atual_ativo
 from app.core.database import SessionLocal
+from app.core.validadores import validar_cnpj_obrigatorio
 from app.models.models import ArquivoLote, Lote, StatusProcessamento, Usuario
 from app.workers.tasks import processar_xml_nfe
 
@@ -32,6 +33,11 @@ async def upload_notas(
     tasks -- sem isso, os cards do dashboard e o badge de status por nota
     não têm fonte de dados (o estado do Celery é efêmero).
     """
+    try:
+        cnpj_cliente = validar_cnpj_obrigatorio(cnpj_cliente)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
     lote_id = str(uuid.uuid4())
     lote_dir = UPLOAD_DIR / lote_id
     lote_dir.mkdir(parents=True, exist_ok=True)

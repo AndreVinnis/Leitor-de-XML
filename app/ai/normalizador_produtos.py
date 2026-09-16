@@ -14,6 +14,7 @@ from google import genai
 from google.genai import types
 from pydantic import BaseModel
 
+from app.ai.gemini_retry import retry_gemini
 from app.core.config import settings
 
 _client: Optional[genai.Client] = None
@@ -24,6 +25,11 @@ def _get_client() -> genai.Client:
     if _client is None:
         _client = genai.Client(api_key=settings.gemini_api_key)
     return _client
+
+
+@retry_gemini
+def _gerar_conteudo(client: genai.Client, **kwargs) -> types.GenerateContentResponse:
+    return client.models.generate_content(**kwargs)
 
 
 class NovoProdutoCanonicoIA(BaseModel):
@@ -84,7 +90,8 @@ def sugerir_normalizacao(
         "Retorne uma sugestão para cada descrição listada acima, na mesma ordem."
     )
 
-    response = client.models.generate_content(
+    response = _gerar_conteudo(
+        client,
         model=settings.gemini_model,
         contents=user_message,
         config=types.GenerateContentConfig(

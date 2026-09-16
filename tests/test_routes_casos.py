@@ -72,14 +72,14 @@ def test_criar_e_listar_caso(client, db_session_factory, logar_usuario):
         json={
             "nome_cliente": "Cliente A",
             "identificacao_caso": "Processo 123",
-            "cnpj_cliente": "98765432000188",
+            "cnpj_cliente": "11222333000181",
         },
     )
     assert resp_criar.status_code == 200
     corpo = resp_criar.json()
     assert corpo["nome_cliente"] == "Cliente A"
     assert corpo["identificacao_caso"] == "Processo 123"
-    assert corpo["cnpj_cliente"] == "98765432000188"
+    assert corpo["cnpj_cliente"] == "11222333000181"
     caso_id = corpo["id"]
 
     resp_lista = client.get("/api/casos")
@@ -98,7 +98,7 @@ def test_criar_caso_sem_identificacao_e_opcional(client, db_session_factory, log
     logar_usuario(usuario)
 
     resp = client.post(
-        "/api/casos", json={"nome_cliente": "Cliente B", "cnpj_cliente": "98765432000188"}
+        "/api/casos", json={"nome_cliente": "Cliente B", "cnpj_cliente": "11222333000181"}
     )
     assert resp.status_code == 200
     assert resp.json()["identificacao_caso"] is None
@@ -112,10 +112,10 @@ def test_criar_caso_com_cnpj_normaliza_pontuacao(client, db_session_factory, log
 
     resp = client.post(
         "/api/casos",
-        json={"nome_cliente": "Cliente D", "cnpj_cliente": "98.765.432/0001-88"},
+        json={"nome_cliente": "Cliente D", "cnpj_cliente": "11.222.333/0001-81"},
     )
     assert resp.status_code == 200
-    assert resp.json()["cnpj_cliente"] == "98765432000188"
+    assert resp.json()["cnpj_cliente"] == "11222333000181"
 
 
 def test_criar_caso_com_cnpj_invalido_retorna_422(client, db_session_factory, logar_usuario):
@@ -146,9 +146,9 @@ def test_atualizar_caso_preenche_cnpj_de_caso_legado(client, db_session_factory,
     session.close()
     logar_usuario(usuario)
 
-    resp = client.patch(f"/api/casos/{caso_id}", json={"cnpj_cliente": "98765432000188"})
+    resp = client.patch(f"/api/casos/{caso_id}", json={"cnpj_cliente": "11222333000181"})
     assert resp.status_code == 200
-    assert resp.json()["cnpj_cliente"] == "98765432000188"
+    assert resp.json()["cnpj_cliente"] == "11222333000181"
     assert resp.json()["nome_cliente"] == "Cliente F"  # campo não enviado permanece igual
 
 
@@ -159,13 +159,13 @@ def test_atualizar_caso_sem_mexer_no_cnpj_nao_altera(client, db_session_factory,
     logar_usuario(usuario)
 
     caso_id = client.post(
-        "/api/casos", json={"nome_cliente": "Cliente H", "cnpj_cliente": "98765432000188"}
+        "/api/casos", json={"nome_cliente": "Cliente H", "cnpj_cliente": "11222333000181"}
     ).json()["id"]
 
     resp = client.patch(f"/api/casos/{caso_id}", json={"nome_cliente": "Cliente H Editado"})
     assert resp.status_code == 200
     assert resp.json()["nome_cliente"] == "Cliente H Editado"
-    assert resp.json()["cnpj_cliente"] == "98765432000188"  # não foi tocado, permanece
+    assert resp.json()["cnpj_cliente"] == "11222333000181"  # não foi tocado, permanece
 
 
 def test_atualizar_caso_nao_permite_remover_cnpj(client, db_session_factory, logar_usuario):
@@ -175,7 +175,7 @@ def test_atualizar_caso_nao_permite_remover_cnpj(client, db_session_factory, log
     logar_usuario(usuario)
 
     caso_id = client.post(
-        "/api/casos", json={"nome_cliente": "Cliente I", "cnpj_cliente": "98765432000188"}
+        "/api/casos", json={"nome_cliente": "Cliente I", "cnpj_cliente": "11222333000181"}
     ).json()["id"]
 
     resp = client.patch(f"/api/casos/{caso_id}", json={"cnpj_cliente": None})
@@ -188,7 +188,7 @@ def test_atualizar_caso_inexistente_retorna_404(client, db_session_factory, loga
     session.close()
     logar_usuario(usuario)
 
-    resp = client.patch("/api/casos/999999", json={"cnpj_cliente": "98765432000188"})
+    resp = client.patch("/api/casos/999999", json={"cnpj_cliente": "11222333000181"})
     assert resp.status_code == 404
 
 
@@ -211,7 +211,7 @@ def test_listar_casos_sem_autenticacao_retorna_401(client, db_session_factory):
 def test_criar_caso_sem_autenticacao_retorna_401(client, db_session_factory):
     db_session_factory()
     resp = client.post(
-        "/api/casos", json={"nome_cliente": "Cliente C", "cnpj_cliente": "98765432000188"}
+        "/api/casos", json={"nome_cliente": "Cliente C", "cnpj_cliente": "11222333000181"}
     )
     assert resp.status_code == 401
 
@@ -228,10 +228,10 @@ def test_atualizar_caso_com_cnpj_ja_definido_retorna_422(client, db_session_fact
     logar_usuario(usuario)
 
     caso_id = client.post(
-        "/api/casos", json={"nome_cliente": "Cliente J", "cnpj_cliente": "98765432000188"}
+        "/api/casos", json={"nome_cliente": "Cliente J", "cnpj_cliente": "11222333000181"}
     ).json()["id"]
 
-    resp = client.patch(f"/api/casos/{caso_id}", json={"cnpj_cliente": "11222333000144"})
+    resp = client.patch(f"/api/casos/{caso_id}", json={"cnpj_cliente": "11444777000161"})
     assert resp.status_code == 422
 
 
@@ -242,12 +242,12 @@ def test_atualizar_caso_reenviar_mesmo_cnpj_nao_da_erro(client, db_session_facto
     logar_usuario(usuario)
 
     caso_id = client.post(
-        "/api/casos", json={"nome_cliente": "Cliente K", "cnpj_cliente": "98765432000188"}
+        "/api/casos", json={"nome_cliente": "Cliente K", "cnpj_cliente": "11222333000181"}
     ).json()["id"]
 
-    resp = client.patch(f"/api/casos/{caso_id}", json={"cnpj_cliente": "98765432000188"})
+    resp = client.patch(f"/api/casos/{caso_id}", json={"cnpj_cliente": "11222333000181"})
     assert resp.status_code == 200
-    assert resp.json()["cnpj_cliente"] == "98765432000188"
+    assert resp.json()["cnpj_cliente"] == "11222333000181"
 
 
 # --------------------------------------------------------------------------
@@ -300,7 +300,7 @@ def _montar_caso_com_dados_relacionados(session, cliente_caso_id):
     lote = Lote(
         id="11111111-1111-1111-1111-111111111111",
         cliente_caso_id=cliente_caso_id,
-        cnpj_cliente="98765432000188",
+        cnpj_cliente="11222333000181",
         total_arquivos=1,
         criado_por_usuario_id=session.query(Usuario).first().id,
     )
@@ -330,7 +330,7 @@ def _montar_caso_com_dados_relacionados(session, cliente_caso_id):
 def test_excluir_caso_admin_remove_tudo_e_gera_log(client, db_session_factory, logar_usuario):
     session = db_session_factory()
     admin = _criar_admin(session)
-    caso = ClienteCaso(nome_cliente="Cliente L", cnpj_cliente="98765432000188")
+    caso = ClienteCaso(nome_cliente="Cliente L", cnpj_cliente="11222333000181")
     session.add(caso)
     session.commit()
     session.refresh(caso)
@@ -363,7 +363,7 @@ def test_excluir_caso_admin_remove_tudo_e_gera_log(client, db_session_factory, l
 def test_excluir_caso_usuario_comum_retorna_403(client, db_session_factory, logar_usuario):
     session = db_session_factory()
     usuario = _criar_usuario(session, "adv13@x.com")
-    caso = ClienteCaso(nome_cliente="Cliente M", cnpj_cliente="98765432000188")
+    caso = ClienteCaso(nome_cliente="Cliente M", cnpj_cliente="11222333000181")
     session.add(caso)
     session.commit()
     session.refresh(caso)

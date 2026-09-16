@@ -14,6 +14,7 @@ import numpy as np
 from google import genai
 from google.genai import types
 
+from app.ai.gemini_retry import retry_gemini
 from app.core.config import settings
 
 _client: Optional[genai.Client] = None
@@ -26,6 +27,11 @@ def _get_client() -> genai.Client:
     if _client is None:
         _client = genai.Client(api_key=settings.gemini_api_key)
     return _client
+
+
+@retry_gemini
+def _embed_lote(client: genai.Client, **kwargs) -> types.EmbedContentResponse:
+    return client.models.embed_content(**kwargs)
 
 
 def gerar_embeddings(textos: list[str], task_type: str = "RETRIEVAL_DOCUMENT") -> list[list[float]]:
@@ -45,7 +51,8 @@ def gerar_embeddings(textos: list[str], task_type: str = "RETRIEVAL_DOCUMENT") -
 
     for i in range(0, len(textos), _TAMANHO_LOTE_EMBEDDING):
         lote = textos[i : i + _TAMANHO_LOTE_EMBEDDING]
-        response = client.models.embed_content(
+        response = _embed_lote(
+            client,
             model=settings.gemini_embedding_model,
             contents=lote,
             config=types.EmbedContentConfig(task_type=task_type),
