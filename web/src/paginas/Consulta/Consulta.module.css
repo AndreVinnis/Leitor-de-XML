@@ -102,9 +102,9 @@
 }
 
 .estadoVazioTexto {
-  font-size: 13px;
-  color: var(--cor-texto-secundario);
-  margin: 0;
+  font-size: 14px;
+  color: var(--cor-texto);
+  margin: 0 0 12px 0;
 }
 
 .tabelaWrapper {
@@ -141,28 +141,51 @@
 }
 
 .contagem {
-  font-size: 13px;
-  color: var(--cor-texto-secundario);
-  margin: 0;
+  font-size: 14px;
+  color: var(--cor-texto);
+  margin: 0 0 12px 0;
 }
 
-.sqlDetalhes {
-  border: 1px solid var(--cor-borda);
-  border-radius: var(--raio-borda);
+.avisoConsultando {
+  position: fixed;
+  bottom: var(--espaco-4);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  padding: var(--espaco-2) var(--espaco-3);
   background: var(--cor-superficie);
-  padding: var(--espaco-3);
-}
-
-.sqlResumo {
-  cursor: pointer;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-pill);
+  box-shadow: var(--sombra-flutuante);
+  color: var(--cor-texto);
   font-size: 13px;
   font-weight: 500;
-  color: var(--cor-texto-secundario);
+  z-index: 50;
 }
 
-.sqlCodigo {
-  margin: var(--espaco-2) 0 0 0;
-  white-space: pre-wrap;
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--cor-borda);
+  border-top-color: var(--cor-primaria);
+  border-radius: 50%;
+  animation: girar 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes girar {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.paginacao {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--espaco-3);
   font-size: 13px;
-  color: var(--cor-texto);
+  color: var(--cor-texto-secundario);
 }

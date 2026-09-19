@@ -269,19 +269,19 @@ export function LayoutApp() {
             </button>
             <button
               type="button"
-              className={`${estilos.navItem} ${location.pathname.includes("/clientes-casos") ? estilos.navItemAtivo : ""}`}
-              onClick={() => casoId && navigate(`/casos/${casoId}/clientes-casos`)}
-            >
-              <span className={estilos.navBolha} />
-              Clientes/Casos
-            </button>
-            <button
-              type="button"
               className={`${estilos.navItem} ${estaAtivo("/consulta") ? estilos.navItemAtivo : ""}`}
               onClick={() => casoId && navigate(`/casos/${casoId}/consulta`)}
             >
               <span className={estilos.navBolha} />
               Consulta
+            </button>
+            <button
+              type="button"
+              className={`${estilos.navItem} ${location.pathname.includes("/clientes-casos") ? estilos.navItemAtivo : ""}`}
+              onClick={() => casoId && navigate(`/casos/${casoId}/clientes-casos`)}
+            >
+              <span className={estilos.navBolha} />
+              Clientes/Casos
             </button>
             <button
               type="button"
@@ -294,21 +294,21 @@ export function LayoutApp() {
             {usuario?.role === "administrador" && (
               <button
                 type="button"
-                className={`${estilos.navItem} ${estaAtivo("/aprovacao-de-cadastros") ? estilos.navItemAtivo : ""}`}
-                onClick={() => casoId && navigate(`/casos/${casoId}/aprovacao-de-cadastros`)}
-              >
-                <span className={estilos.navBolha} />
-                Aprovação de Cadastros
-              </button>
-            )}
-            {usuario?.role === "administrador" && (
-              <button
-                type="button"
                 className={`${estilos.navItem} ${estaAtivo("/logs-auditoria") ? estilos.navItemAtivo : ""}`}
                 onClick={() => casoId && navigate(`/casos/${casoId}/logs-auditoria`)}
               >
                 <span className={estilos.navBolha} />
                 Auditoria
+              </button>
+            )}
+            {usuario?.role === "administrador" && (
+              <button
+                type="button"
+                className={`${estilos.navItem} ${estaAtivo("/aprovacao-de-cadastros") ? estilos.navItemAtivo : ""}`}
+                onClick={() => casoId && navigate(`/casos/${casoId}/aprovacao-de-cadastros`)}
+              >
+                <span className={estilos.navBolha} />
+                Aprovação de Cadastros
               </button>
             )}
           </nav>
