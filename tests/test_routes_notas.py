@@ -391,3 +391,123 @@ def test_listar_notas_sem_autenticacao_retorna_401(client, db_session_factory):
     db_session_factory()  # garante as tabelas criadas
     resp = client.get("/api/notas")
     assert resp.status_code == 401
+
+
+# -- GET /api/notas/ids e POST /api/notas/download -------------------------
+
+
+def test_listar_ids_notas_respeita_filtros(client, db_session_factory, logar_usuario):
+    session = db_session_factory()
+    usuario = _criar_usuario(session)
+    caso_a = _criar_caso(session, "Cliente A")
+    caso_b = _criar_caso(session, "Cliente B")
+    n1 = _criar_nota(session, caso_a.id, "A" * 44, "1", tipo=TipoNota.ENTRADA)
+    _criar_nota(session, caso_a.id, "B" * 44, "2", tipo=TipoNota.SAIDA)
+    _criar_nota(session, caso_b.id, "C" * 44, "3", tipo=TipoNota.ENTRADA)
+    logar_usuario(usuario)
+
+    resposta = client.get(f"/api/notas/ids?cliente_caso_id={caso_a.id}&tipo=entrada")
+
+    assert resposta.status_code == 200
+    assert resposta.json() == {"ids": [n1.id], "total": 1, "limitado": False}
+
+
+def test_listar_ids_notas_limita_a_500(client, db_session_factory, logar_usuario, monkeypatch):
+    monkeypatch.setattr("app.api.routes_notas.LIMITE_DOWNLOAD_NOTAS", 2)
+    session = db_session_factory()
+    usuario = _criar_usuario(session)
+    caso = _criar_caso(session)
+    for i in range(3):
+        _criar_nota(session, caso.id, str(i) * 44, str(i))
+    logar_usuario(usuario)
+
+    corpo = client.get(f"/api/notas/ids?cliente_caso_id={caso.id}").json()
+
+    assert len(corpo["ids"]) == 2
+    assert corpo["total"] == 3
+    assert corpo["limitado"] is True
+
+
+def _nota_com_xml(session, caso_id, chave, numero, caminho):
+    nota = _criar_nota(session, caso_id, chave, numero)
+    nota.arquivo_origem = str(caminho)
+    session.commit()
+    return nota
+
+
+def test_download_uma_nota_devolve_o_xml(client, db_session_factory, logar_usuario, tmp_path, monkeypatch):
+    monkeypatch.setattr("app.api.routes_upload.UPLOAD_DIR", tmp_path)
+    xml = tmp_path / "lote" / "nota1.xml"
+    xml.parent.mkdir()
+    xml.write_text("<NFe>1</NFe>")
+    session = db_session_factory()
+    usuario = _criar_usuario(session)
+    caso = _criar_caso(session)
+    nota = _nota_com_xml(session, caso.id, "A" * 44, "1", xml)
+    logar_usuario(usuario)
+
+    resposta = client.post("/api/notas/download", json={"ids": [nota.id]})
+
+    assert resposta.status_code == 200
+    assert resposta.headers["content-type"].startswith("application/xml")
+    assert 'filename="nota1.xml"' in resposta.headers["content-disposition"]
+    assert resposta.text == "<NFe>1</NFe>"
+
+
+def test_download_varias_notas_devolve_zip_e_conta_ausentes(
+    client, db_session_factory, logar_usuario, tmp_path, monkeypatch
+):
+    import io
+    import zipfile
+
+    monkeypatch.setattr("app.api.routes_upload.UPLOAD_DIR", tmp_path)
+    (tmp_path / "lote1").mkdir()
+    (tmp_path / "lote2").mkdir()
+    # Mesmo nome de arquivo em lotes diferentes: o ZIP não pode sobrescrever.
+    xml1 = tmp_path / "lote1" / "nota.xml"
+    xml2 = tmp_path / "lote2" / "nota.xml"
+    xml1.write_text("<NFe>1</NFe>")
+    xml2.write_text("<NFe>2</NFe>")
+    session = db_session_factory()
+    usuario = _criar_usuario(session)
+    caso = _criar_caso(session)
+    n1 = _nota_com_xml(session, caso.id, "A" * 44, "1", xml1)
+    n2 = _nota_com_xml(session, caso.id, "B" * 44, "2", xml2)
+    n3 = _nota_com_xml(session, caso.id, "C" * 44, "3", tmp_path / "lote1" / "sumiu.xml")
+    logar_usuario(usuario)
+
+    resposta = client.post("/api/notas/download", json={"ids": [n1.id, n2.id, n3.id]})
+
+    assert resposta.status_code == 200
+    assert resposta.headers["content-type"] == "application/zip"
+    assert resposta.headers["x-arquivos-ausentes"] == "1"
+    with zipfile.ZipFile(io.BytesIO(resposta.content)) as zf:
+        assert len(zf.namelist()) == 2
+        assert {zf.read(nome).decode() for nome in zf.namelist()} == {"<NFe>1</NFe>", "<NFe>2</NFe>"}
+
+
+def test_download_ignora_caminho_fora_do_diretorio_de_uploads(
+    client, db_session_factory, logar_usuario, tmp_path, monkeypatch
+):
+    uploads = tmp_path / "uploads"
+    uploads.mkdir()
+    monkeypatch.setattr("app.api.routes_upload.UPLOAD_DIR", uploads)
+    fora = tmp_path / "segredo.xml"
+    fora.write_text("<segredo/>")
+    session = db_session_factory()
+    usuario = _criar_usuario(session)
+    caso = _criar_caso(session)
+    nota = _nota_com_xml(session, caso.id, "A" * 44, "1", fora)
+    logar_usuario(usuario)
+
+    resposta = client.post("/api/notas/download", json={"ids": [nota.id]})
+
+    assert resposta.status_code == 404
+
+
+def test_download_valida_quantidade_de_ids(client, db_session_factory, logar_usuario):
+    session = db_session_factory()
+    logar_usuario(_criar_usuario(session))
+
+    assert client.post("/api/notas/download", json={"ids": []}).status_code == 422
+    assert client.post("/api/notas/download", json={"ids": list(range(1, 502))}).status_code == 422
