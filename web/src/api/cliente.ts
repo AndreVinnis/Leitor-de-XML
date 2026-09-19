@@ -88,6 +88,49 @@ async function requisitar<T>(caminho: string, opcoes: OpcoesRequisicao = {}): Pr
   return (await resposta.json()) as T;
 }
 
+/**
+ * POST JSON que devolve um arquivo: baixa o blob e dispara o download no
+ * browser. Não usa `<a href>` porque o POST precisa do header anti-CSRF.
+ * Devolve quantos arquivos o backend informou como ausentes.
+ */
+export async function baixarArquivoPost(caminho: string, corpo: unknown, nomePadrao: string): Promise<number> {
+  const resposta = await fetch(`${BASE_URL}${caminho}`, {
+    method: "POST",
+    body: JSON.stringify(corpo),
+    headers: { [HEADER_ANTI_CSRF]: VALOR_HEADER_ANTI_CSRF, "Content-Type": "application/json" },
+    credentials: "same-origin",
+  });
+
+  if (resposta.status === 401) {
+    limparSessao();
+    aoSessaoExpirar?.();
+    throw new ErroApi(401, "Sua sessão expirou. Faça login novamente.");
+  }
+
+  if (!resposta.ok) {
+    let detalhe = `Erro ${resposta.status}`;
+    try {
+      const erro = await resposta.json();
+      detalhe = typeof erro.detail === "string" ? erro.detail : JSON.stringify(erro.detail ?? erro);
+    } catch {
+      /* corpo de erro não é JSON -- mantém a mensagem genérica acima */
+    }
+    throw new ErroApi(resposta.status, detalhe);
+  }
+
+  const nome = /filename="([^"]+)"/.exec(resposta.headers.get("Content-Disposition") ?? "")?.[1] ?? nomePadrao;
+  const url = URL.createObjectURL(await resposta.blob());
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = nome;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+
+  return Number(resposta.headers.get("X-Arquivos-Ausentes") ?? 0);
+}
+
 export function get<T>(caminho: string, opcoes?: OpcoesRequisicao) {
   return requisitar<T>(caminho, { ...opcoes, method: "GET" });
 }

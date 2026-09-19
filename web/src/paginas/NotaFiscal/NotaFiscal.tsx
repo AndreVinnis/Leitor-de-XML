@@ -1,4 +1,4 @@
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { obterNota } from "../../api/notas";
 import type { ItemNotaDetalhe, StatusNota } from "../../api/tipos";
@@ -62,6 +62,8 @@ const COLUNAS_ITENS: ColunaTabela<ItemNotaDetalhe>[] = [
 
 export function NotaFiscal() {
   const { casoId, notaId } = useParams<{ casoId: string; notaId: string }>();
+  // Filtros da lista de origem (ver NotasFiscais.tsx); vazio se a nota foi aberta por link direto.
+  const filtrosNotas = (useLocation().state as { filtrosNotas?: string } | null)?.filtrosNotas;
   const notaIdNumero = Number(notaId);
 
   const nota = useQuery({
@@ -72,7 +74,7 @@ export function NotaFiscal() {
   return (
     <div className={estilos.pagina}>
       <div className={estilos.cabecalho}>
-        <Link to={casoId ? `/casos/${casoId}/notas` : "#"} className={estilos.linkVoltar}>
+        <Link to={casoId ? `/casos/${casoId}/notas${filtrosNotas ? `?${filtrosNotas}` : ""}` : "#"} className={estilos.linkVoltar}>
           ← Voltar para Notas Fiscais
         </Link>
 

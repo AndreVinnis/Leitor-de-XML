@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { consultar } from "../../api/consulta";
+import { baixarNotas } from "../../api/notas";
 import { ErroApi } from "../../api/cliente";
 import type { ResultadoConsulta } from "../../api/tipos";
 import { Badge } from "../../componentes/Badge";
 import { Botao } from "../../componentes/Botao";
+import { BarraSelecaoNotas } from "../../componentes/BarraSelecaoNotas";
 import { Card } from "../../componentes/Card";
 import { useToast } from "../../componentes/Toast";
 import estilos from "./Consulta.module.css";
@@ -23,6 +25,9 @@ function formatarCelula(valor: unknown): string {
   return String(valor);
 }
 
+// Mesmo teto do backend (LIMITE_DOWNLOAD_NOTAS em app/api/routes_notas.py).
+const LIMITE_DOWNLOAD_NOTAS = 500;
+
 export function Consulta() {
   const { casoId } = useParams<{ casoId: string }>();
   const casoIdNumero = Number(casoId);
@@ -32,11 +37,14 @@ export function Consulta() {
   const [consultando, setConsultando] = useState(false);
   const [resultado, setResultado] = useState<ResultadoConsulta | null>(null);
   const [bloqueio, setBloqueio] = useState<string | null>(null);
+  const [selecionadas, setSelecionadas] = useState<Set<number>>(new Set());
+  const [baixando, setBaixando] = useState(false);
 
   async function handleConsultar() {
     if (!pergunta.trim()) return;
     setConsultando(true);
     setBloqueio(null);
+    setSelecionadas(new Set());
     try {
       const resposta = await consultar(pergunta.trim(), casoIdNumero);
       setResultado(resposta);
@@ -55,6 +63,45 @@ export function Consulta() {
   const colunasNumericas = resultado
     ? resultado.colunas.map((_, indice) => colunaENumerica(resultado.linhas, indice))
     : [];
+
+  // O id da nota só existe no resultado se a IA incluiu a coluna nota_id
+  // (regra no prompt de app/ai/consulta_nl_sql.py); sem ela, não há download.
+  const indiceNotaId = resultado ? resultado.colunas.findIndex((coluna) => coluna.toLowerCase() === "nota_id") : -1;
+  const idsDoResultado =
+    resultado && indiceNotaId >= 0
+      ? [...new Set(resultado.linhas.map((linha) => Number(linha[indiceNotaId])).filter((id) => Number.isInteger(id)))]
+      : [];
+
+  function alternarSelecao(id: number) {
+    setSelecionadas((atual) => {
+      const proximo = new Set(atual);
+      if (proximo.has(id)) proximo.delete(id);
+      else proximo.add(id);
+      return proximo;
+    });
+  }
+
+  function handleSelecionarTodas() {
+    setSelecionadas(new Set(idsDoResultado.slice(0, LIMITE_DOWNLOAD_NOTAS)));
+    if (idsDoResultado.length > LIMITE_DOWNLOAD_NOTAS) {
+      notificar(
+        `O resultado tem ${idsDoResultado.length} notas. Foram selecionadas as primeiras ${LIMITE_DOWNLOAD_NOTAS} (limite por download).`,
+        "erro"
+      );
+    }
+  }
+
+  async function handleBaixar() {
+    setBaixando(true);
+    try {
+      const ausentes = await baixarNotas([...selecionadas]);
+      if (ausentes > 0) notificar(`${ausentes} XML(s) não foram encontrados no servidor e ficaram fora do arquivo.`, "erro");
+    } catch (excecao) {
+      notificar(excecao instanceof ErroApi ? excecao.message : "Erro de comunicação com a API.", "erro");
+    } finally {
+      setBaixando(false);
+    }
+  }
 
   return (
     <div className={estilos.pagina}>
@@ -103,10 +150,20 @@ export function Consulta() {
 
       {resultado && resultado.linhas.length > 0 && (
         <Card>
+          {indiceNotaId >= 0 && (
+            <BarraSelecaoNotas
+              selecionadas={selecionadas.size}
+              baixando={baixando}
+              onSelecionarTodas={handleSelecionarTodas}
+              onLimpar={() => setSelecionadas(new Set())}
+              onBaixar={handleBaixar}
+            />
+          )}
           <div className={estilos.tabelaWrapper}>
             <table className={estilos.tabela}>
               <thead>
                 <tr>
+                  {indiceNotaId >= 0 && <th aria-label="Seleção" />}
                   {resultado.colunas.map((coluna, indice) => (
                     <th key={coluna} className={colunasNumericas[indice] ? estilos.celulaNumerica : undefined}>
                       {coluna}
@@ -118,6 +175,16 @@ export function Consulta() {
                 {resultado.linhas.map((linha, indiceLinha) => (
                   // eslint-disable-next-line react/no-array-index-key -- a API não devolve um id de linha
                   <tr key={indiceLinha}>
+                    {indiceNotaId >= 0 && (
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={selecionadas.has(Number(linha[indiceNotaId]))}
+                          onChange={() => alternarSelecao(Number(linha[indiceNotaId]))}
+                          aria-label={`Selecionar nota ${formatarCelula(linha[indiceNotaId])}`}
+                        />
+                      </td>
+                    )}
                     {linha.map((valor, indiceColuna) => (
                       <td
                         key={indiceColuna}
