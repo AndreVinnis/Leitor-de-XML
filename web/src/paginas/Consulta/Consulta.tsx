@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { consultar } from "../../api/consulta";
 import { baixarNotas } from "../../api/notas";
@@ -28,17 +28,37 @@ function formatarCelula(valor: unknown): string {
 // Mesmo teto do backend (LIMITE_DOWNLOAD_NOTAS em app/api/routes_notas.py).
 const LIMITE_DOWNLOAD_NOTAS = 500;
 
+const ITENS_POR_PAGINA = 30;
+
+interface EstadoConsulta {
+  pergunta: string;
+  resultado: ResultadoConsulta | null;
+  bloqueio: string | null;
+  selecionadas: Set<number>;
+  pagina: number;
+}
+
+// Vive no módulo (não no componente) para sobreviver à navegação entre telas.
+// Some ao recarregar a página, de propósito: o resultado não é persistido.
+const estadoSalvoPorCaso = new Map<number, EstadoConsulta>();
+
 export function Consulta() {
   const { casoId } = useParams<{ casoId: string }>();
   const casoIdNumero = Number(casoId);
   const { notificar } = useToast();
+  const salvo = estadoSalvoPorCaso.get(casoIdNumero);
 
-  const [pergunta, setPergunta] = useState("");
+  const [pergunta, setPergunta] = useState(salvo?.pergunta ?? "");
   const [consultando, setConsultando] = useState(false);
-  const [resultado, setResultado] = useState<ResultadoConsulta | null>(null);
-  const [bloqueio, setBloqueio] = useState<string | null>(null);
-  const [selecionadas, setSelecionadas] = useState<Set<number>>(new Set());
+  const [resultado, setResultado] = useState<ResultadoConsulta | null>(salvo?.resultado ?? null);
+  const [bloqueio, setBloqueio] = useState<string | null>(salvo?.bloqueio ?? null);
+  const [selecionadas, setSelecionadas] = useState<Set<number>>(salvo?.selecionadas ?? new Set());
   const [baixando, setBaixando] = useState(false);
+  const [pagina, setPagina] = useState(salvo?.pagina ?? 0);
+
+  useEffect(() => {
+    estadoSalvoPorCaso.set(casoIdNumero, { pergunta, resultado, bloqueio, selecionadas, pagina });
+  }, [casoIdNumero, pergunta, resultado, bloqueio, selecionadas, pagina]);
 
   async function handleConsultar() {
     if (!pergunta.trim()) return;
@@ -48,6 +68,7 @@ export function Consulta() {
     try {
       const resposta = await consultar(pergunta.trim(), casoIdNumero);
       setResultado(resposta);
+      setPagina(0);
     } catch (excecao) {
       if (excecao instanceof ErroApi && excecao.status === 422) {
         setResultado(null);
@@ -71,6 +92,17 @@ export function Consulta() {
     resultado && indiceNotaId >= 0
       ? [...new Set(resultado.linhas.map((linha) => Number(linha[indiceNotaId])).filter((id) => Number.isInteger(id)))]
       : [];
+
+  const totalPaginas = resultado ? Math.max(1, Math.ceil(resultado.linhas.length / ITENS_POR_PAGINA)) : 1;
+  const linhasDaPagina = resultado
+    ? resultado.linhas.slice(pagina * ITENS_POR_PAGINA, (pagina + 1) * ITENS_POR_PAGINA)
+    : [];
+
+  const textoContagem = resultado ? (
+    <>
+      <strong>{resultado.total_linhas}</strong> {resultado.total_linhas === 1 ? "resultado encontrado" : "resultados encontrados"}
+    </>
+  ) : null;
 
   function alternarSelecao(id: number) {
     setSelecionadas((atual) => {
@@ -150,14 +182,17 @@ export function Consulta() {
 
       {resultado && resultado.linhas.length > 0 && (
         <Card>
-          {indiceNotaId >= 0 && (
+          {indiceNotaId >= 0 ? (
             <BarraSelecaoNotas
               selecionadas={selecionadas.size}
               baixando={baixando}
               onSelecionarTodas={handleSelecionarTodas}
               onLimpar={() => setSelecionadas(new Set())}
               onBaixar={handleBaixar}
+              resumo={textoContagem}
             />
+          ) : (
+            <p className={estilos.contagem}>{textoContagem}</p>
           )}
           <div className={estilos.tabelaWrapper}>
             <table className={estilos.tabela}>
@@ -172,7 +207,7 @@ export function Consulta() {
                 </tr>
               </thead>
               <tbody>
-                {resultado.linhas.map((linha, indiceLinha) => (
+                {linhasDaPagina.map((linha, indiceLinha) => (
                   // eslint-disable-next-line react/no-array-index-key -- a API não devolve um id de linha
                   <tr key={indiceLinha}>
                     {indiceNotaId >= 0 && (
@@ -201,17 +236,29 @@ export function Consulta() {
         </Card>
       )}
 
-      {resultado && (
-        <p className={estilos.contagem}>
-          {resultado.total_linhas} resultado(s) encontrado(s)
-        </p>
+      {resultado && totalPaginas > 1 && (
+        <div className={estilos.paginacao}>
+          <Botao variante="secundario" onClick={() => setPagina((atual) => atual - 1)} disabled={pagina === 0}>
+            Página anterior
+          </Botao>
+          <span>
+            Página {pagina + 1} de {totalPaginas}
+          </span>
+          <Botao
+            variante="secundario"
+            onClick={() => setPagina((atual) => atual + 1)}
+            disabled={pagina >= totalPaginas - 1}
+          >
+            Próxima página
+          </Botao>
+        </div>
       )}
 
-      {resultado && (
-        <details className={estilos.sqlDetalhes}>
-          <summary className={estilos.sqlResumo}>SQL gerado</summary>
-          <pre className={estilos.sqlCodigo}>{resultado.sql_gerado}</pre>
-        </details>
+      {consultando && (
+        <div className={estilos.avisoConsultando} role="status">
+          <span className={estilos.spinner} />
+          <span>Consultando, isso pode demorar um pouco...</span>
+        </div>
       )}
     </div>
   );
