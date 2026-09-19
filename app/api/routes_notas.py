@@ -1,6 +1,11 @@
+import io
+import zipfile
 from datetime import date, timedelta
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
+from pydantic import BaseModel, Field
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
@@ -9,6 +14,47 @@ from app.core.database import SessionLocal
 from app.models.models import ArquivoLote, Lote, Nota, StatusProcessamento, TipoNota, Usuario
 
 router = APIRouter()
+
+LIMITE_DOWNLOAD_NOTAS = 500
+
+
+def _filtrar_notas(
+    db: Session,
+    cliente_caso_id: int | None,
+    status: str | None,
+    tipo: str | None,
+    q: str | None,
+    data_inicio: date | None,
+    data_fim: date | None,
+):
+    """Query base (Nota + status do ArquivoLote) com os filtros da tela Notas Fiscais."""
+    query = db.query(Nota, ArquivoLote.status).outerjoin(
+        ArquivoLote, ArquivoLote.nota_id == Nota.id
+    )
+    if cliente_caso_id is not None:
+        query = query.filter(Nota.cliente_caso_id == cliente_caso_id)
+    if status is not None:
+        query = query.filter(ArquivoLote.status == StatusProcessamento(status))
+    if tipo is not None:
+        query = query.filter(Nota.tipo == TipoNota(tipo))
+    if q is not None:
+        termo = f"%{q}%"
+        query = query.filter(
+            or_(
+                Nota.numero.ilike(termo),
+                Nota.chave_acesso.ilike(termo),
+                Nota.emitente_nome.ilike(termo),
+            )
+        )
+    if data_inicio is not None:
+        query = query.filter(Nota.data_emissao >= data_inicio)
+    if data_fim is not None:
+        # data_emissao é DateTime e costuma ter hora (não só a meia-noite
+        # do dia); comparar com "<=" contra a date pura excluiria o
+        # próprio dia final. Soma 1 dia e usa "<" para incluir o dia
+        # inteiro.
+        query = query.filter(Nota.data_emissao < data_fim + timedelta(days=1))
+    return query
 
 
 @router.get("")
@@ -31,32 +77,7 @@ async def listar_notas(
     """
     db: Session = SessionLocal()
     try:
-        query = db.query(Nota, ArquivoLote.status).outerjoin(
-            ArquivoLote, ArquivoLote.nota_id == Nota.id
-        )
-        if cliente_caso_id is not None:
-            query = query.filter(Nota.cliente_caso_id == cliente_caso_id)
-        if status is not None:
-            query = query.filter(ArquivoLote.status == StatusProcessamento(status))
-        if tipo is not None:
-            query = query.filter(Nota.tipo == TipoNota(tipo))
-        if q is not None:
-            termo = f"%{q}%"
-            query = query.filter(
-                or_(
-                    Nota.numero.ilike(termo),
-                    Nota.chave_acesso.ilike(termo),
-                    Nota.emitente_nome.ilike(termo),
-                )
-            )
-        if data_inicio is not None:
-            query = query.filter(Nota.data_emissao >= data_inicio)
-        if data_fim is not None:
-            # data_emissao é DateTime e costuma ter hora (não só a meia-noite
-            # do dia); comparar com "<=" contra a date pura excluiria o
-            # próprio dia final. Soma 1 dia e usa "<" para incluir o dia
-            # inteiro.
-            query = query.filter(Nota.data_emissao < data_fim + timedelta(days=1))
+        query = _filtrar_notas(db, cliente_caso_id, status, tipo, q, data_inicio, data_fim)
 
         total = query.count()
         resultados = query.order_by(Nota.criado_em.desc()).offset(offset).limit(limit).all()
@@ -79,6 +100,95 @@ async def listar_notas(
         return {"itens": itens, "total": total}
     finally:
         db.close()
+
+
+@router.get("/ids")
+async def listar_ids_notas(
+    cliente_caso_id: int | None = None,
+    status: str | None = None,
+    tipo: str | None = None,
+    q: str | None = None,
+    data_inicio: date | None = None,
+    data_fim: date | None = None,
+    usuario: Usuario = Depends(usuario_atual_ativo),
+):
+    """
+    Ids das notas que batem com os filtros de GET "" (sem paginação), para o
+    "selecionar todas" da tela Notas Fiscais. Limitado a LIMITE_DOWNLOAD_NOTAS;
+    `limitado` avisa quando o filtro tem mais notas que isso.
+    """
+    db: Session = SessionLocal()
+    try:
+        query = _filtrar_notas(db, cliente_caso_id, status, tipo, q, data_inicio, data_fim)
+        total = query.count()
+        resultados = query.order_by(Nota.criado_em.desc()).limit(LIMITE_DOWNLOAD_NOTAS).all()
+        return {
+            "ids": [nota.id for nota, _ in resultados],
+            "total": total,
+            "limitado": total > LIMITE_DOWNLOAD_NOTAS,
+        }
+    finally:
+        db.close()
+
+
+class DownloadNotasEntrada(BaseModel):
+    ids: list[int] = Field(min_length=1, max_length=LIMITE_DOWNLOAD_NOTAS)
+
+
+def _caminho_xml_seguro(arquivo_origem: str | None) -> Path | None:
+    """
+    Resolve o caminho do XML e só o aceita se estiver dentro de UPLOAD_DIR e
+    existir -- nunca serve um caminho arbitrário do disco.
+    """
+    from app.api.routes_upload import UPLOAD_DIR
+
+    if not arquivo_origem:
+        return None
+    caminho = Path(arquivo_origem).resolve()
+    if not caminho.is_relative_to(UPLOAD_DIR.resolve()) or not caminho.is_file():
+        return None
+    return caminho
+
+
+@router.post("/download")
+async def baixar_notas(
+    entrada: DownloadNotasEntrada, usuario: Usuario = Depends(usuario_atual_ativo)
+):
+    """
+    Devolve o XML original das notas pedidas: o próprio XML se for uma só,
+    ou um ZIP se forem várias. Arquivos ausentes em disco são pulados e
+    contados no header X-Arquivos-Ausentes.
+    """
+    ids = list(dict.fromkeys(entrada.ids))
+    db: Session = SessionLocal()
+    try:
+        notas = db.query(Nota).filter(Nota.id.in_(ids)).all()
+        caminhos = [(n, _caminho_xml_seguro(n.arquivo_origem)) for n in notas]
+    finally:
+        db.close()
+
+    disponiveis = [(n, c) for n, c in caminhos if c is not None]
+    ausentes = len(ids) - len(disponiveis)
+    if not disponiveis:
+        raise HTTPException(status_code=404, detail="Nenhum XML encontrado para as notas pedidas.")
+
+    cabecalhos = {"X-Arquivos-Ausentes": str(ausentes)}
+    if len(disponiveis) == 1:
+        _, caminho = disponiveis[0]
+        cabecalhos["Content-Disposition"] = f'attachment; filename="{caminho.name}"'
+        return Response(content=caminho.read_bytes(), media_type="application/xml", headers=cabecalhos)
+
+    buffer = io.BytesIO()
+    usados: set[str] = set()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        for nota, caminho in disponiveis:
+            nome = caminho.name
+            if nome in usados:
+                nome = f"{caminho.stem}_{nota.id}{caminho.suffix}"
+            usados.add(nome)
+            zf.write(caminho, arcname=nome)
+    cabecalhos["Content-Disposition"] = 'attachment; filename="notas_fiscais.zip"'
+    return Response(content=buffer.getvalue(), media_type="application/zip", headers=cabecalhos)
 
 
 @router.get("/lotes")

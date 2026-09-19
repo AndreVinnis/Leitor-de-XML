@@ -60,6 +60,9 @@ valor real é injetado depois pelo backend.
 produtos_canonicos (por produto_canonico_id) e/ou notas (por nota_id) \
 conforme necessário para responder quantidade, valor total, preço e \
 categoria.
+- Quando a resposta listar notas ou itens individuais (sem agregação como \
+SUM/COUNT/GROUP BY), inclua sempre a coluna "notas.id AS nota_id" -- o \
+usuário usa esse id para baixar os XMLs. Em consultas agregadas, não inclua.
 - Não use nenhuma tabela ou coluna fora da lista acima.
 
 Você recebe também a lista de produtos canônicos já cadastrados no caso (id, \

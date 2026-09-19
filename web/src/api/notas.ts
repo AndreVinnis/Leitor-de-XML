@@ -1,6 +1,7 @@
-import { get, post } from "./cliente";
+import { baixarArquivoPost, get, post } from "./cliente";
 import type {
   ListaLotesComErro,
+  ListaIdsNotas,
   ListaNotas,
   NotaDetalhe,
   ProgressoLote,
@@ -30,6 +31,24 @@ export function listarNotas(params: ParametrosListarNotas): Promise<ListaNotas> 
   query.set("limit", String(params.limit ?? 20));
   query.set("offset", String(params.offset ?? 0));
   return get<ListaNotas>(`/api/notas?${query.toString()}`);
+}
+
+type FiltrosNotas = Pick<ParametrosListarNotas, "clienteCasoId" | "status" | "tipo" | "q" | "dataInicio" | "dataFim">;
+
+/** Ids de todas as notas do filtro (o backend limita a 500) -- alimenta o "selecionar todas". */
+export function listarIdsNotas(params: FiltrosNotas): Promise<ListaIdsNotas> {
+  const query = new URLSearchParams({ cliente_caso_id: String(params.clienteCasoId) });
+  if (params.status) query.set("status", params.status);
+  if (params.tipo) query.set("tipo", params.tipo);
+  if (params.q) query.set("q", params.q);
+  if (params.dataInicio) query.set("data_inicio", params.dataInicio);
+  if (params.dataFim) query.set("data_fim", params.dataFim);
+  return get<ListaIdsNotas>(`/api/notas/ids?${query.toString()}`);
+}
+
+/** Baixa o XML (1 nota) ou um ZIP (várias). Devolve quantos XMLs não foram encontrados no servidor. */
+export function baixarNotas(ids: number[]): Promise<number> {
+  return baixarArquivoPost("/api/notas/download", { ids }, ids.length === 1 ? "nota.xml" : "notas_fiscais.zip");
 }
 
 export function obterNota(notaId: number): Promise<NotaDetalhe> {

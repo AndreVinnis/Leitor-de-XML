@@ -55,6 +55,12 @@ export interface ListaNotas {
   total: number;
 }
 
+export interface ListaIdsNotas {
+  ids: number[];
+  total: number;
+  limitado: boolean;
+}
+
 export interface ItemNotaDetalhe {
   id: number;
   numero_item: number | null;
