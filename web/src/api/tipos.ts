@@ -165,6 +165,17 @@ export interface ListaCanonicos {
   total: number;
 }
 
+export interface ResultadoTransferencia {
+  destino_id: number;
+  nome_canonico: string;
+  // Conta TODAS as linhas de itens_nota movidas, inclusive de notas
+  // canceladas -- pode ser maior que o itens_vinculados_count exibido na
+  // tabela, que filtra por nota autorizada (app/api/routes_produtos.py).
+  itens_movidos: number;
+  sugestoes_repontadas: number;
+  achados_repontados: number;
+}
+
 export interface DisparoNormalizacao {
   status: string;
   task_id: string;

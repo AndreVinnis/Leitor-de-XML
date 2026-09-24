@@ -13,6 +13,7 @@ import {
   rejeitarSugestao,
   rejeitarSugestoesLote,
   statusNormalizacao,
+  transferirCanonico,
 } from "../../api/produtos";
 import { ErroApi } from "../../api/cliente";
 import type { ProdutoCanonico, ResultadoRevisao, StatusRevisao, SugestaoNormalizacao } from "../../api/tipos";
@@ -571,6 +572,7 @@ function AbaCanonicos() {
   const [busca, setBusca] = useState("");
   const [offset, setOffset] = useState(0);
   const [editando, setEditando] = useState<ProdutoCanonico | null>(null);
+  const [transferindo, setTransferindo] = useState<ProdutoCanonico | null>(null);
 
   useEffect(() => {
     const temporizador = setTimeout(() => setBusca(buscaDigitada), 400);
@@ -625,6 +627,15 @@ function AbaCanonicos() {
             onClick={() => setEditando(canonico)}
           >
             ✎
+          </button>
+          <button
+            type="button"
+            className={estilos.acaoNeutra}
+            title="Transferir para outro produto canônico"
+            disabled={(todosCanonicos.data?.itens.length ?? 0) < 2}
+            onClick={() => setTransferindo(canonico)}
+          >
+            ⇄
           </button>
           <button
             type="button"
@@ -696,6 +707,31 @@ function AbaCanonicos() {
           }}
         />
       )}
+
+      {transferindo && (
+        <ModalTransferirCanonico
+          origem={transferindo}
+          canonicos={todosCanonicos.data?.itens ?? []}
+          onFechar={() => setTransferindo(null)}
+          onTransferido={async (nomeDestino, itensMovidos) => {
+            // A origem some da lista. Se ela era a única linha desta página
+            // (a última), o offset ficaria além do total e a tabela
+            // apareceria vazia com só "Página anterior" habilitado.
+            const eraUnicaDaPagina = (canonicos.data?.itens.length ?? 0) === 1;
+            setTransferindo(null);
+            if (eraUnicaDaPagina && offset > 0) setOffset(Math.max(0, offset - LIMITE_CANONICOS));
+            await queryClient.invalidateQueries({ queryKey: ["canonicos-tabela", casoIdNumero] });
+            await queryClient.invalidateQueries({ queryKey: ["canonicos-todos", casoIdNumero] });
+            await queryClient.invalidateQueries({ queryKey: ["itens-vinculados"] });
+            notificar(
+              `Produto transferido para "${nomeDestino}": ${itensMovidos} ${
+                itensMovidos === 1 ? "item movido" : "itens movidos"
+              }.`,
+              "sucesso"
+            );
+          }}
+        />
+      )}
     </>
   );
 }
@@ -745,6 +781,83 @@ function ModalEditarCanonico({ canonico, categorias, onFechar, onSalvo }: ModalE
           </Botao>
           <Botao type="submit" disabled={salvando}>
             {salvando ? "Salvando..." : "Salvar alterações"}
+          </Botao>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+interface ModalTransferirCanonicoProps {
+  origem: ProdutoCanonico;
+  canonicos: ProdutoCanonico[];
+  onFechar: () => void;
+  onTransferido: (nomeDestino: string, itensMovidos: number) => void;
+}
+
+/**
+ * Absorve o canônico da linha (origem) em outro do mesmo caso. Operação
+ * irreversível -- por isso o destino nasce vazio (escolha explícita) e o
+ * botão de confirmar só habilita depois da escolha.
+ */
+function ModalTransferirCanonico({ origem, canonicos, onFechar, onTransferido }: ModalTransferirCanonicoProps) {
+  const { notificar } = useToast();
+  const destinos = useMemo(() => canonicos.filter((c) => c.id !== origem.id), [canonicos, origem.id]);
+  const [destinoId, setDestinoId] = useState("");
+  const [transferindo, setTransferindo] = useState(false);
+
+  async function handleSubmit(evento: FormEvent) {
+    evento.preventDefault();
+    if (!destinoId) {
+      notificar("Escolha o produto canônico de destino.", "erro");
+      return;
+    }
+    setTransferindo(true);
+    try {
+      const resultado = await transferirCanonico(origem.id, Number(destinoId));
+      onTransferido(resultado.nome_canonico, resultado.itens_movidos);
+    } catch (excecao) {
+      notificar(excecao instanceof ErroApi ? excecao.message : "Erro de comunicação com a API.", "erro");
+    } finally {
+      setTransferindo(false);
+    }
+  }
+
+  return (
+    <Modal aberto onFechar={onFechar} titulo="Transferir produto canônico">
+      <form onSubmit={handleSubmit} className={estilos.formModal}>
+        <div className={estilos.grupoCampo}>
+          <label className={estilos.rotuloCampo}>Transferir &quot;{origem.nome_canonico}&quot; para</label>
+          <select
+            className={estilos.selectNativo}
+            value={destinoId}
+            onChange={(evento) => setDestinoId(evento.target.value)}
+            aria-label="Produto canônico de destino"
+          >
+            <option value="">Selecione o produto de destino...</option>
+            {destinos.map((canonico) => (
+              <option key={canonico.id} value={canonico.id}>
+                {canonico.nome_canonico} ({canonico.categoria || "sem categoria"})
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <p className={estilos.avisoModal}>
+          Os {origem.itens_vinculados_count}{" "}
+          {origem.itens_vinculados_count === 1 ? "item vinculado" : "itens vinculados"} a &quot;
+          {origem.nome_canonico}&quot; -- mais os itens de notas canceladas, que não entram nessa
+          contagem -- passam a apontar para o produto escolhido, junto com as sugestões da IA que
+          citavam esta origem. Em seguida, &quot;{origem.nome_canonico}&quot; é excluído. Esta ação
+          não pode ser desfeita.
+        </p>
+
+        <div className={estilos.acoesModal}>
+          <Botao type="button" variante="secundario" onClick={onFechar}>
+            Cancelar
+          </Botao>
+          <Botao type="submit" disabled={transferindo || !destinoId}>
+            {transferindo ? "Transferindo..." : "Confirmar transferência"}
           </Botao>
         </div>
       </form>

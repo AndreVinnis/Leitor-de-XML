@@ -7,6 +7,7 @@ import type {
   ProdutoCanonico,
   ResultadoRevisao,
   ResultadoRevisaoLote,
+  ResultadoTransferencia,
   StatusNormalizacao,
   StatusRevisao,
   TipoNota,
@@ -148,4 +149,19 @@ export function reatribuirItem(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ produto_canonico_id: produtoCanonicoId }),
   });
+}
+
+/**
+ * Absorve o produto canônico de ORIGEM em outro do mesmo caso: itens,
+ * sugestões e achados são repontados para o destino e a origem é excluída.
+ * Irreversível -- a UI sempre confirma antes (ModalTransferirCanonico).
+ */
+export function transferirCanonico(
+  produtoCanonicoId: number,
+  destinoId: number
+): Promise<ResultadoTransferencia> {
+  return postJson<ResultadoTransferencia>(
+    `/api/produtos/canonicos/${produtoCanonicoId}/transferir`,
+    { destino_id: destinoId }
+  );
 }
