@@ -9,6 +9,7 @@ from app.core.auth import usuario_atual_ativo
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.models.models import (
+    AchadoReconciliacao,
     ItemNota,
     LogAuditoria,
     Nota,
@@ -351,6 +352,97 @@ async def editar_canonico(
 
         db.commit()
         return {"id": canonico.id, "nome_canonico": canonico.nome_canonico, "categoria": canonico.categoria}
+    finally:
+        db.close()
+
+
+@router.post("/canonicos/{produto_canonico_id}/transferir")
+async def transferir_canonico(
+    produto_canonico_id: int,
+    destino_id: int = Body(..., embed=True),
+    usuario: Usuario = Depends(usuario_atual_ativo),
+):
+    """
+    Absorve um produto canônico (ORIGEM, no path) em outro do mesmo caso
+    (DESTINO, no corpo): todo item de nota, sugestão de normalização e achado
+    de reconciliação que apontava para a origem passa a apontar para o
+    destino, e a origem é excluída ao final. Puramente determinístico, sem IA.
+
+    A sugestão da IA é REPONTADA, não apagada -- inclusive as já revisadas:
+    apagar o rastro de "a IA sugeriu X para este item" destruiria prova, e a
+    decisão do revisor continua válida (o produto sugerido é que passou a se
+    chamar outra coisa).
+
+    A ordem aqui é load-bearing: os três UPDATEs vêm SEMPRE antes do delete da
+    origem. Nenhuma FK para produtos_canonicos tem ON DELETE CASCADE, e
+    `db.delete(origem)` com a relationship ProdutoCanonico.itens (sem cascade)
+    ainda populada anularia itens_nota.produto_canonico_id em vez de movê-lo
+    -- invertida a ordem, a operação perderia o vínculo dos itens em silêncio.
+    """
+    db: Session = SessionLocal()
+    try:
+        origem = db.get(ProdutoCanonico, produto_canonico_id)
+        if origem is None:
+            raise HTTPException(status_code=404, detail="produto canônico não encontrado")
+
+        if destino_id == produto_canonico_id:
+            raise HTTPException(
+                status_code=400, detail="origem e destino são o mesmo produto canônico"
+            )
+
+        destino = db.get(ProdutoCanonico, destino_id)
+        if destino is None or destino.cliente_caso_id != origem.cliente_caso_id:
+            raise HTTPException(
+                status_code=400, detail="destino_id inválido para o caso deste produto"
+            )
+
+        # Capturados antes do commit: SessionLocal usa expire_on_commit=True
+        # (default) e `origem` deixa de existir depois do delete.
+        nome_origem = origem.nome_canonico
+        nome_destino = destino.nome_canonico
+
+        itens_movidos = (
+            db.query(ItemNota)
+            .filter(ItemNota.produto_canonico_id == produto_canonico_id)
+            .update({"produto_canonico_id": destino_id}, synchronize_session=False)
+        )
+        sugestoes_repontadas = (
+            db.query(SugestaoNormalizacao)
+            .filter(SugestaoNormalizacao.produto_canonico_sugerido_id == produto_canonico_id)
+            .update({"produto_canonico_sugerido_id": destino_id}, synchronize_session=False)
+        )
+        # NOT NULL e sem ON DELETE CASCADE: repontar é a única saída que não
+        # apaga achado nem deixa a FK barrar o delete. cliente_caso_id não
+        # muda -- origem e destino são do mesmo caso, garantido acima.
+        achados_repontados = (
+            db.query(AchadoReconciliacao)
+            .filter(AchadoReconciliacao.produto_canonico_id == produto_canonico_id)
+            .update({"produto_canonico_id": destino_id}, synchronize_session=False)
+        )
+
+        db.add(
+            LogAuditoria(
+                usuario_id=usuario.id,
+                acao="transferencia_produto_canonico",
+                resultado_resumo=(
+                    f"Produto canônico {produto_canonico_id} ('{nome_origem}') transferido para "
+                    f"{destino_id} ('{nome_destino}') e excluído: {itens_movidos} item(ns), "
+                    f"{sugestoes_repontadas} sugestão(ões), "
+                    f"{achados_repontados} achado(s) de reconciliação."
+                ),
+            )
+        )
+
+        db.delete(origem)
+        db.commit()
+
+        return {
+            "destino_id": destino_id,
+            "nome_canonico": nome_destino,
+            "itens_movidos": itens_movidos,
+            "sugestoes_repontadas": sugestoes_repontadas,
+            "achados_repontados": achados_repontados,
+        }
     finally:
         db.close()
 
