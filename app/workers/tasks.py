@@ -557,6 +557,15 @@ def normalizar_produtos_pendentes(cliente_caso_id: int) -> dict:
         ]
         canonicos_por_id = {c["id"]: c for c in canonicos_existentes}
         ids_canonicos_existentes = {c["id"] for c in canonicos_existentes}
+        # Por nome normalizado (mesma chave de _normalizar_chave) -- usado
+        # para não tentar inserir um produto_canonico com nome que já existe
+        # (uq_produto_canonico_caso_nome). A IA não coordena "produto novo"
+        # entre descrições de um mesmo lote nem enxerga um canônico fora do
+        # pré-filtro de embedding, então pode sugerir o mesmo nome como novo
+        # mais de uma vez dentro desta mesma execução.
+        canonicos_por_nome = {
+            _normalizar_chave(c["nome_canonico"]): c["id"] for c in canonicos_existentes
+        }
         # Só entram no pré-filtro canônicos com embedding do modelo
         # atualmente configurado -- um embedding de modelo antigo é tratado
         # como inexistente, nunca comparado por cosseno contra um vetor de
@@ -617,31 +626,68 @@ def normalizar_produtos_pendentes(cliente_caso_id: int) -> dict:
                 if produto_canonico_id is None:
                     if resultado.novo_produto_canonico is None:
                         continue  # sem correspondência e sem produto novo -- ignora
-                    novo = ProdutoCanonico(
-                        cliente_caso_id=cliente_caso_id,
-                        nome_canonico=resultado.novo_produto_canonico.nome_canonico,
-                        categoria=resultado.novo_produto_canonico.categoria,
-                    )
-                    novo.embedding = serializar_embedding(gerar_embeddings([novo.nome_canonico])[0])
-                    novo.embedding_modelo = settings.gemini_embedding_model
-                    db.add(novo)
-                    db.flush()  # garante novo.id
-                    produto_canonico_id = novo.id
-                    ids_canonicos_existentes.add(produto_canonico_id)
-                    # Registra o canônico recém-criado nas estruturas em
-                    # memória -- sem isso, ele só existiria como id válido
-                    # para a próxima chamada da IA, mas não apareceria como
-                    # candidato real (nem na lista cheia, nem no pré-filtro
-                    # de embedding) nos lotes seguintes desta mesma execução.
-                    novo_dict = {
-                        "id": novo.id,
-                        "nome_canonico": novo.nome_canonico,
-                        "categoria": novo.categoria,
-                    }
-                    canonicos_existentes.append(novo_dict)
-                    canonicos_por_id[novo.id] = novo_dict
-                    embeddings_canonicos[novo.id] = novo.embedding
-                    produtos_canonicos_criados += 1
+
+                    chave_nome = _normalizar_chave(resultado.novo_produto_canonico.nome_canonico)
+                    produto_canonico_id = canonicos_por_nome.get(chave_nome)
+
+                    if produto_canonico_id is None:
+                        novo = ProdutoCanonico(
+                            cliente_caso_id=cliente_caso_id,
+                            nome_canonico=resultado.novo_produto_canonico.nome_canonico,
+                            categoria=resultado.novo_produto_canonico.categoria,
+                        )
+                        novo.embedding = serializar_embedding(gerar_embeddings([novo.nome_canonico])[0])
+                        novo.embedding_modelo = settings.gemini_embedding_model
+                        try:
+                            with db.begin_nested():
+                                db.add(novo)
+                                db.flush()  # garante novo.id
+                        except IntegrityError:
+                            # uq_produto_canonico_caso_nome: outra execução
+                            # concorrente desta task para o mesmo
+                            # cliente_caso_id criou esse nome entre a
+                            # consulta de canonicos_orm e este flush. Reusa o
+                            # canônico existente em vez de abortar a
+                            # transação inteira (e com ela todas as
+                            # sugestões já válidas deste lote).
+                            existente = (
+                                db.query(ProdutoCanonico)
+                                .filter(
+                                    ProdutoCanonico.cliente_caso_id == cliente_caso_id,
+                                    ProdutoCanonico.nome_canonico
+                                    == resultado.novo_produto_canonico.nome_canonico,
+                                )
+                                .one()
+                            )
+                            produto_canonico_id = existente.id
+                            novo_dict = {
+                                "id": existente.id,
+                                "nome_canonico": existente.nome_canonico,
+                                "categoria": existente.categoria,
+                            }
+                            if existente.embedding and existente.embedding_modelo == settings.gemini_embedding_model:
+                                embeddings_canonicos[existente.id] = existente.embedding
+                        else:
+                            produto_canonico_id = novo.id
+                            novo_dict = {
+                                "id": novo.id,
+                                "nome_canonico": novo.nome_canonico,
+                                "categoria": novo.categoria,
+                            }
+                            embeddings_canonicos[novo.id] = novo.embedding
+                            produtos_canonicos_criados += 1
+
+                        # Registra o canônico (criado agora ou reaproveitado
+                        # de uma colisão) nas estruturas em memória -- sem
+                        # isso, ele só existiria como id válido para a
+                        # próxima chamada da IA, mas não apareceria como
+                        # candidato real (nem na lista cheia, nem no
+                        # pré-filtro de embedding, nem na dedução por nome)
+                        # nos lotes seguintes desta mesma execução.
+                        canonicos_existentes.append(novo_dict)
+                        canonicos_por_id[produto_canonico_id] = novo_dict
+                        canonicos_por_nome[chave_nome] = produto_canonico_id
+                        ids_canonicos_existentes.add(produto_canonico_id)
 
                 for item in grupos[chave]:
                     db.add(
