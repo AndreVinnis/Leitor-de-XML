@@ -4,6 +4,7 @@ from app.models.models import (
     AchadoReconciliacao,
     ArquivoLote,
     ClienteCaso,
+    EventoNFe,
     ItemNota,
     LogAuditoria,
     Lote,
@@ -316,6 +317,18 @@ def _montar_caso_com_dados_relacionados(session, cliente_caso_id):
     session.add(arquivo)
     session.commit()
 
+    evento = EventoNFe(
+        cliente_caso_id=cliente_caso_id,
+        chave_acesso=nota.chave_acesso,
+        tipo_evento="110111",
+        numero_sequencia=1,
+        cstat="135",
+        aplicado=True,
+        nota_id=nota.id,
+    )
+    session.add(evento)
+    session.commit()
+
     return {
         "nota_id": nota.id,
         "item_id": item.id,
@@ -324,6 +337,7 @@ def _montar_caso_com_dados_relacionados(session, cliente_caso_id):
         "achado_id": achado.id,
         "lote_id": lote.id,
         "arquivo_id": arquivo.id,
+        "evento_id": evento.id,
     }
 
 
@@ -352,6 +366,7 @@ def test_excluir_caso_admin_remove_tudo_e_gera_log(client, db_session_factory, l
     assert session.get(AchadoReconciliacao, ids["achado_id"]) is None
     assert session.get(Lote, ids["lote_id"]) is None
     assert session.get(ArquivoLote, ids["arquivo_id"]) is None
+    assert session.get(EventoNFe, ids["evento_id"]) is None
 
     logs = session.query(LogAuditoria).filter(LogAuditoria.acao == "exclusao_cliente_caso").all()
     assert len(logs) == 1

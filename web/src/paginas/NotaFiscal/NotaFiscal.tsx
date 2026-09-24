@@ -15,6 +15,7 @@ const STATUS_PARA_BADGE: Record<StatusNota, StatusBadge> = {
   pendente: "pendente",
   erro: "erro",
   duplicado: "neutro",
+  evento: "evento",
 };
 
 const formatadorMoeda = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });

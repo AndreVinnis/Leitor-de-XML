@@ -11,7 +11,15 @@ from sqlalchemy.orm import Session
 
 from app.core.auth import usuario_atual_ativo
 from app.core.database import SessionLocal
-from app.models.models import ArquivoLote, Lote, Nota, StatusProcessamento, TipoNota, Usuario
+from app.models.models import (
+    ArquivoLote,
+    Lote,
+    Nota,
+    SituacaoNota,
+    StatusProcessamento,
+    TipoNota,
+    Usuario,
+)
 
 router = APIRouter()
 
@@ -26,6 +34,7 @@ def _filtrar_notas(
     q: str | None,
     data_inicio: date | None,
     data_fim: date | None,
+    situacao: str | None = None,
 ):
     """Query base (Nota + status do ArquivoLote) com os filtros da tela Notas Fiscais."""
     query = db.query(Nota, ArquivoLote.status).outerjoin(
@@ -37,6 +46,8 @@ def _filtrar_notas(
         query = query.filter(ArquivoLote.status == StatusProcessamento(status))
     if tipo is not None:
         query = query.filter(Nota.tipo == TipoNota(tipo))
+    if situacao is not None:
+        query = query.filter(Nota.situacao == SituacaoNota(situacao))
     if q is not None:
         termo = f"%{q}%"
         query = query.filter(
@@ -65,19 +76,20 @@ async def listar_notas(
     q: str | None = None,
     data_inicio: date | None = None,
     data_fim: date | None = None,
+    situacao: str | None = None,
     limit: int = 50,
     offset: int = 0,
     usuario: Usuario = Depends(usuario_atual_ativo),
 ):
     """
     Alimenta o dashboard ("Notas recentes") e a tela Notas Fiscais: numero,
-    tipo, emitente_nome, destinatario_nome, data_emissao, valor_total e o
-    status de processamento (que vive em ArquivoLote, não em Nota -- ver
-    app/models/models.py).
+    tipo, emitente_nome, destinatario_nome, data_emissao, valor_total, a
+    situacao (autorizada/cancelada, ver app/models/models.py::Nota) e o
+    status de processamento (que vive em ArquivoLote, não em Nota).
     """
     db: Session = SessionLocal()
     try:
-        query = _filtrar_notas(db, cliente_caso_id, status, tipo, q, data_inicio, data_fim)
+        query = _filtrar_notas(db, cliente_caso_id, status, tipo, q, data_inicio, data_fim, situacao)
 
         total = query.count()
         resultados = query.order_by(Nota.criado_em.desc()).offset(offset).limit(limit).all()
@@ -93,6 +105,7 @@ async def listar_notas(
                 # Decimal serializado como string, não float: é dinheiro e o
                 # frontend não deve receber ponto flutuante nesse campo.
                 "valor_total": str(nota.valor_total) if nota.valor_total is not None else None,
+                "situacao": nota.situacao.value if nota.situacao is not None else None,
                 "status": status_arquivo.value if status_arquivo is not None else None,
             }
             for nota, status_arquivo in resultados
@@ -110,6 +123,7 @@ async def listar_ids_notas(
     q: str | None = None,
     data_inicio: date | None = None,
     data_fim: date | None = None,
+    situacao: str | None = None,
     usuario: Usuario = Depends(usuario_atual_ativo),
 ):
     """
@@ -119,7 +133,7 @@ async def listar_ids_notas(
     """
     db: Session = SessionLocal()
     try:
-        query = _filtrar_notas(db, cliente_caso_id, status, tipo, q, data_inicio, data_fim)
+        query = _filtrar_notas(db, cliente_caso_id, status, tipo, q, data_inicio, data_fim, situacao)
         total = query.count()
         resultados = query.order_by(Nota.criado_em.desc()).limit(LIMITE_DOWNLOAD_NOTAS).all()
         return {
@@ -304,6 +318,8 @@ async def obter_nota(nota_id: int, usuario: Usuario = Depends(usuario_atual_ativ
             "destinatario_nome": nota.destinatario_nome,
             # Dinheiro: string decimal, nunca float -- mesma regra de listar_notas.
             "valor_total": str(nota.valor_total) if nota.valor_total is not None else None,
+            "situacao": nota.situacao.value if nota.situacao is not None else None,
+            "cancelada_em": nota.cancelada_em,
             "cliente_caso_id": nota.cliente_caso_id,
             "status": arquivo_lote.status.value if arquivo_lote is not None and arquivo_lote.status is not None else None,
             "arquivo_origem": arquivo_lote.nome_arquivo if arquivo_lote is not None else None,

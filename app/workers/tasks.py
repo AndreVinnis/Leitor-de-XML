@@ -1,3 +1,5 @@
+from sqlalchemy.exc import IntegrityError
+
 from app.ai.embeddings import gerar_embeddings, selecionar_candidatos_similares, serializar_embedding
 from app.ai.normalizador_produtos import sugerir_normalizacao
 from app.core.config import settings
@@ -6,10 +8,13 @@ from app.core.email import enviar_email
 from app.core.tokens import gerar_token_aprovacao
 from app.models.models import (
     ArquivoLote,
+    EventoNFe,
     ItemNota,
+    Lote,
     Nota,
     ProdutoCanonico,
     RoleUsuario,
+    SituacaoNota,
     StatusCadastro,
     StatusProcessamento,
     StatusRevisao,
@@ -17,8 +22,20 @@ from app.models.models import (
     TipoNota,
     Usuario,
 )
+from app.parsers.evento_parser import TIPO_CANCELAMENTO, EventoParseError, parse_evento_xml
 from app.parsers.nfe_parser import NFeParseError, classificar_tipo, parse_nfe_xml
 from app.workers.celery_app import celery_app
+
+# cStat do retEvento que contam como "o Sefaz efetivamente registrou o
+# evento": 135 registrado e vinculado, 136 registrado não vinculado, 155
+# cancelamento homologado fora de prazo. Um evento sem <retEvento> (só o
+# pedido) ou com cStat de rejeição fica de fora -- é o que impede um pedido
+# de cancelamento não homologado de cancelar a nota.
+CSTAT_EVENTO_REGISTRADO = {"135", "136", "155"}
+
+# Ambiente de produção do Sefaz -- evento de homologação (tpAmb=2) nunca
+# pode alterar uma nota real, mesmo que a chave de acesso combine.
+TP_AMB_PRODUCAO = "1"
 
 TAMANHO_LOTE_IA = 50
 
@@ -49,11 +66,53 @@ def _atualizar_status_arquivo_lote(db, arquivo_lote_id: int, resultado: dict) ->
         arquivo_lote.nota_id = resultado.get("nota_id")
     elif resultado["status"] == "ja_existente":
         arquivo_lote.status = StatusProcessamento.DUPLICADO
+    elif resultado["status"] == "evento":
+        # Nunca preenche nota_id aqui -- routes_notas.py busca ArquivoLote
+        # por nota_id com .one_or_none() e um outerjoin que assume no máximo
+        # um arquivo por nota; o rastro do arquivo de evento vive em
+        # EventoNFe.arquivo_lote_id.
+        arquivo_lote.status = StatusProcessamento.EVENTO
     else:  # "erro" ou "erro_inesperado"
         arquivo_lote.status = StatusProcessamento.ERRO
         arquivo_lote.motivo_erro = resultado.get("motivo")
 
+    lote_id = arquivo_lote.lote_id
     db.commit()
+
+    _disparar_varredura_se_lote_terminou(db, lote_id)
+
+
+def _disparar_varredura_se_lote_terminou(db, lote_id: str) -> None:
+    """
+    Dispara aplicar_eventos_pendentes assim que o último ArquivoLote do lote
+    chega a um status terminal, em vez de um countdown fixo depois do
+    enfileiramento (routes_upload.py chegou a usar um countdown de 60s, mas
+    o tamanho do lote não tem relação com esse número -- um lote grande pode
+    não ter terminado, e um pequeno já terminou bem antes).
+
+    A consulta roda em transação nova, aberta depois do commit acima -- vê o
+    estado mais recente de todo ArquivoLote do lote, inclusive os que outros
+    workers acabaram de commitar (mesma invariante de leitura cruzada usada
+    em _aplicar_efeito_evento). Mais de um arquivo pode terminar "ao mesmo
+    tempo" e cada um ver zero pendentes, disparando a varredura mais de uma
+    vez -- inofensivo, porque aplicar_eventos_pendentes é idempotente.
+    """
+    pendentes = (
+        db.query(ArquivoLote.id)
+        .filter(
+            ArquivoLote.lote_id == lote_id,
+            ArquivoLote.status.in_(
+                [StatusProcessamento.PENDENTE, StatusProcessamento.PROCESSANDO]
+            ),
+        )
+        .first()
+    )
+    if pendentes is not None:
+        return  # ainda tem arquivo do lote em andamento
+
+    lote = db.get(Lote, lote_id)
+    if lote is not None:
+        aplicar_eventos_pendentes.delay(lote.cliente_caso_id)
 
 
 def _marcar_processando(db, arquivo_lote_id: int) -> None:
@@ -72,6 +131,147 @@ def _marcar_processando(db, arquivo_lote_id: int) -> None:
     db.commit()
 
 
+def _evento_cancela_nota(evento: EventoNFe) -> bool:
+    """Política de quando um evento tem efeito jurídico sobre a nota --
+    mantida separada do parser (app/parsers/evento_parser.py só extrai
+    dados), no mesmo espírito de app/core/sql_seguranca.py: a leitura não
+    decide, a regra decide."""
+    return (
+        evento.tipo_evento == TIPO_CANCELAMENTO
+        and evento.cstat in CSTAT_EVENTO_REGISTRADO
+        and evento.tp_amb == TP_AMB_PRODUCAO
+    )
+
+
+def _aplicar_efeito_evento(db, evento_id: int) -> None:
+    """
+    Aplica o efeito de um evento sobre a nota correspondente, se a nota já
+    existir e o evento for elegível (ver _evento_cancela_nota). Idempotente:
+    pode ser chamado de novo para o mesmo evento sem duplicar efeito, e sem
+    reverter uma nota já cancelada.
+
+    Só deve ser chamado a partir de uma transação aberta DEPOIS do commit do
+    registro (evento ou nota) que disparou a checagem -- nunca antes. Sob
+    REPEATABLE READ (default do MySQL/InnoDB), o read view nasce na primeira
+    leitura da transação, não no BEGIN; ler no mesmo bloco que ainda vai
+    commitar enxergaria um snapshot anterior ao commit do lado oposto
+    (nota↔evento processados em paralelo por workers diferentes) e o efeito
+    se perderia em silêncio. Isso está garantido hoje porque cada chamada
+    ocorre logo após um db.commit() desta mesma função chamadora.
+    """
+    evento = db.get(EventoNFe, evento_id)
+    if evento is None or evento.aplicado:
+        return
+
+    nota = (
+        db.query(Nota)
+        .filter(Nota.chave_acesso == evento.chave_acesso, Nota.cliente_caso_id == evento.cliente_caso_id)
+        .one_or_none()
+    )
+    if nota is None:
+        return  # órfão -- aplicado quando a nota desta chave for importada
+
+    evento.nota_id = nota.id
+
+    if _evento_cancela_nota(evento):
+        # UPDATE condicional em vez de SELECT ... FOR UPDATE como sonda: em
+        # REPEATABLE READ, FOR UPDATE numa chave que talvez não exista toma
+        # gap lock e monta ciclo com o outro lado (deadlock 1213). O WHERE
+        # abaixo já torna a operação um no-op se a nota já estiver cancelada.
+        db.query(Nota).filter(Nota.id == nota.id, Nota.situacao != SituacaoNota.CANCELADA).update(
+            {"situacao": SituacaoNota.CANCELADA, "cancelada_em": evento.data_evento}
+        )
+
+    evento.aplicado = True
+    db.commit()
+
+
+def _aplicar_eventos_pendentes_da_chave(db, chave_acesso: str, cliente_caso_id: int) -> None:
+    """Aplica todo evento ainda não aplicado daquela chave, assim que a nota
+    aparece (seja porque acabou de ser criada, seja num reprocessamento que
+    caiu no ramo "já existente"). Falha aqui não pode derrubar o sucesso de
+    quem chamou -- o evento continua com aplicado=False e é pego depois pela
+    task aplicar_eventos_pendentes."""
+    try:
+        pendentes = (
+            db.query(EventoNFe.id)
+            .filter(
+                EventoNFe.chave_acesso == chave_acesso,
+                EventoNFe.cliente_caso_id == cliente_caso_id,
+                EventoNFe.aplicado.is_(False),
+            )
+            .all()
+        )
+        for (evento_id,) in pendentes:
+            _aplicar_efeito_evento(db, evento_id)
+    except Exception:  # noqa: BLE001
+        db.rollback()
+
+
+def _processar_evento(db, caminho_arquivo: str, cliente_caso_id: int, arquivo_lote_id: int) -> dict:
+    """Persiste um evento de NF-e e tenta aplicar o efeito imediatamente
+    (a nota pode já existir). Chamado só depois que parse_nfe_xml falhou
+    (ver processar_xml_nfe) -- se parse_evento_xml também falhar, quem
+    decide o que reportar é o chamador, não esta função."""
+    evento_dto = parse_evento_xml(caminho_arquivo)
+    # Nunca NULL: MySQL/SQLite não aplicam UNIQUE entre linhas com NULL na
+    # coluna, e cstat entra na chave natural do evento (ver EventoNFe).
+    cstat = evento_dto.cstat or ""
+
+    evento = EventoNFe(
+        cliente_caso_id=cliente_caso_id,
+        chave_acesso=evento_dto.chave_acesso,
+        tipo_evento=evento_dto.tipo_evento,
+        numero_sequencia=evento_dto.numero_sequencia,
+        descricao_evento=evento_dto.descricao_evento,
+        data_evento=evento_dto.data_evento,
+        justificativa=evento_dto.justificativa,
+        tp_amb=evento_dto.tp_amb,
+        protocolo=evento_dto.protocolo,
+        cstat=cstat,
+        motivo=evento_dto.motivo,
+        arquivo_lote_id=arquivo_lote_id,
+        arquivo_origem=caminho_arquivo,
+    )
+    db.add(evento)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        # Reupload do mesmo evento (mesma chave+tipo+sequência+cstat, dentro
+        # do mesmo caso) -- trata como duplicado, mas ainda tenta aplicar
+        # pendente: o primeiro upload pode ter chegado antes da nota
+        # existir. Filtra por cliente_caso_id também: sem isso, o mesmo
+        # evento importado em dois casos colidiria na unique e o segundo
+        # caso leria (e "aplicaria pendente" para) a linha do primeiro.
+        evento = (
+            db.query(EventoNFe)
+            .filter_by(
+                cliente_caso_id=cliente_caso_id,
+                chave_acesso=evento_dto.chave_acesso,
+                tipo_evento=evento_dto.tipo_evento,
+                numero_sequencia=evento_dto.numero_sequencia,
+                cstat=cstat,
+            )
+            .one_or_none()
+        )
+        if evento is None:
+            # IntegrityError por outro motivo (FK inválida etc.) -- não é
+            # duplicata de verdade, deixa subir para o retry genérico em vez
+            # de mascarar como "ja_existente".
+            raise
+        _aplicar_eventos_pendentes_da_chave(db, evento.chave_acesso, cliente_caso_id)
+        return {"status": "ja_existente", "chave_acesso": evento_dto.chave_acesso}
+
+    _aplicar_eventos_pendentes_da_chave(db, evento.chave_acesso, cliente_caso_id)
+
+    return {
+        "status": "evento",
+        "chave_acesso": evento_dto.chave_acesso,
+        "tipo_evento": evento_dto.tipo_evento,
+    }
+
+
 @celery_app.task(
     name="processar_xml_nfe",
     bind=True,
@@ -83,11 +283,16 @@ def processar_xml_nfe(
     self, caminho_arquivo: str, cnpj_cliente: str, cliente_caso_id: int, arquivo_lote_id: int
 ) -> dict:
     """
-    Processa um único arquivo XML de NF-e:
-    1. Faz parsing determinístico (sem IA).
-    2. Classifica como entrada/saída com base no CNPJ do cliente do caso.
-    3. Persiste nota + itens no banco (sem normalização de produto ainda --
-       isso acontece em uma etapa posterior, assíncrona também).
+    Processa um único arquivo XML de NF-e OU de evento de NF-e:
+    1. Tenta parsing determinístico de nota; se não achar <infNFe>, tenta
+       parsing de evento (cancelamento, carta de correção, manifestação).
+       Se os dois falharem, reporta o erro do parser de NOTA (é o caminho
+       comum, e é a mensagem que o usuário já conhece para XML malformado).
+    2. Nota: classifica entrada/saída, persiste nota + itens, e aplica
+       qualquer evento pendente daquela chave (pode ter chegado antes).
+    3. Evento: persiste em EventoNFe e aplica o efeito na nota se ela já
+       existir (ver _aplicar_efeito_evento) -- senão fica órfão até a nota
+       chegar num upload futuro.
     4. Atualiza o ArquivoLote correspondente (criado antes do enfileiramento,
        em routes_upload.py) com o desfecho do processamento.
 
@@ -101,11 +306,29 @@ def processar_xml_nfe(
     try:
         _marcar_processando(db, arquivo_lote_id)
 
-        nota_dto = parse_nfe_xml(caminho_arquivo)
+        try:
+            nota_dto = parse_nfe_xml(caminho_arquivo)
+        except NFeParseError as erro_nota:
+            # Escopo estreito de propósito: classificar_tipo (chamado só
+            # abaixo, fora deste try) também levanta NFeParseError, e não
+            # pode cair aqui -- senão uma nota legítima com CNPJ divergente
+            # do cliente do caso seria mandada, errado, para o parser de
+            # evento.
+            try:
+                resultado = _processar_evento(db, caminho_arquivo, cliente_caso_id, arquivo_lote_id)
+                return resultado
+            except EventoParseError:
+                # Nem nota nem evento -- reporta o erro ORIGINAL do parser
+                # de nota, que é o caminho comum e a mensagem já conhecida.
+                db.rollback()
+                resultado = {"status": "erro", "arquivo": caminho_arquivo, "motivo": str(erro_nota)}
+                return resultado
+
         tipo = classificar_tipo(nota_dto, cnpj_cliente)
 
         existente = db.query(Nota).filter_by(chave_acesso=nota_dto.chave_acesso).first()
         if existente:
+            _aplicar_eventos_pendentes_da_chave(db, existente.chave_acesso, cliente_caso_id)
             resultado = {"status": "ja_existente", "chave_acesso": nota_dto.chave_acesso}
             return resultado
 
@@ -143,6 +366,9 @@ def processar_xml_nfe(
             )
 
         db.commit()
+
+        _aplicar_eventos_pendentes_da_chave(db, nota.chave_acesso, cliente_caso_id)
+
         resultado = {
             "status": "ok",
             "chave_acesso": nota_dto.chave_acesso,
@@ -152,7 +378,8 @@ def processar_xml_nfe(
         return resultado
 
     except NFeParseError as exc:
-        # Determinístico -- reprocessar um XML malformado não muda o
+        # classificar_tipo caiu aqui (CNPJ do cliente não bate com emitente
+        # nem destinatário) -- determinístico, reprocessar não muda o
         # resultado, então não passa pelo retry abaixo.
         db.rollback()
         resultado = {"status": "erro", "arquivo": caminho_arquivo, "motivo": str(exc)}
@@ -291,6 +518,9 @@ def normalizar_produtos_pendentes(cliente_caso_id: int) -> dict:
     Escopado por cliente_caso_id: tanto os itens pendentes quanto o catálogo
     de canônicos existentes usado como contexto para a IA são restritos ao
     caso, para não misturar vocabulário/dados de produto entre clientes.
+
+    Item de nota CANCELADA fica de fora: não vale gastar chamada de IA
+    normalizando produto de uma nota que não conta mais para reconciliação.
     """
     db = SessionLocal()
     try:
@@ -301,6 +531,7 @@ def normalizar_produtos_pendentes(cliente_caso_id: int) -> dict:
             .filter(ItemNota.produto_canonico_id.is_(None))
             .filter(SugestaoNormalizacao.id.is_(None))
             .filter(Nota.cliente_caso_id == cliente_caso_id)
+            .filter(Nota.situacao != SituacaoNota.CANCELADA)
             .all()
         )
         if not itens_pendentes:
@@ -434,5 +665,51 @@ def normalizar_produtos_pendentes(cliente_caso_id: int) -> dict:
     except Exception as exc:  # noqa: BLE001
         db.rollback()
         return {"status": "erro_inesperado", "motivo": str(exc)}
+    finally:
+        db.close()
+
+
+@celery_app.task(name="aplicar_eventos_pendentes")
+def aplicar_eventos_pendentes(cliente_caso_id: int) -> dict:
+    """
+    Varre eventos ainda não aplicados (aplicado=False) de um caso e tenta
+    aplicar de novo. Fecha a janela que a ordenação de commits de
+    processar_xml_nfe não fecha sozinha: um crash entre o commit do evento
+    (ou da nota) e o UPDATE que aplica o efeito deixa aplicado=False para
+    sempre, sem nada que reprocesse aquela chave -- exceto esta varredura.
+
+    Enfileirada pela rota de upload com um `countdown`, para rodar depois do
+    lote assentar (ver app/api/routes_upload.py). Não existe celery-beat
+    configurado neste projeto; se um dia existir, esta task é a candidata
+    natural a virar periódica.
+    """
+    db = SessionLocal()
+    try:
+        pendentes = (
+            db.query(EventoNFe.id)
+            .filter(EventoNFe.cliente_caso_id == cliente_caso_id, EventoNFe.aplicado.is_(False))
+            .all()
+        )
+        aplicados = 0
+        com_falha = 0
+        for (evento_id,) in pendentes:
+            # Cada evento em try/except próprio -- um erro num evento (ex.:
+            # nota apagada, dado inconsistente) não pode abortar a varredura
+            # inteira e deixar os demais pendentes sem chance de aplicar.
+            try:
+                _aplicar_efeito_evento(db, evento_id)
+            except Exception:  # noqa: BLE001
+                db.rollback()
+                com_falha += 1
+                continue
+            evento = db.get(EventoNFe, evento_id)
+            if evento is not None and evento.aplicado:
+                aplicados += 1
+        return {
+            "status": "ok",
+            "verificados": len(pendentes),
+            "aplicados": aplicados,
+            "com_falha": com_falha,
+        }
     finally:
         db.close()

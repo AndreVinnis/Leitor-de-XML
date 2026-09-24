@@ -34,3 +34,8 @@
   background: var(--cor-accent-fundo);
   color: var(--cor-primaria);
 }
+
+.evento {
+  background: var(--cor-accent-fundo);
+  color: var(--cor-primaria);
+}

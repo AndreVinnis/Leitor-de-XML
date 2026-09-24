@@ -83,6 +83,16 @@ def validar_e_finalizar_sql(sql: str) -> str:
             "A consulta precisa filtrar por :cliente_caso_id para não vazar dados de outro caso."
         )
 
+    # notas.situacao decide se uma nota CANCELADA entra na conta -- exigir a
+    # coluna explicitamente na query (mesmo padrão de :cliente_caso_id acima)
+    # força o SQL gerado a decidir isso, em vez de depender só da instrução
+    # de prompt em app/ai/consulta_nl_sql.py (que a IA pode ignorar).
+    if "notas" in tabelas and "situacao" not in sql_limpo.lower():
+        raise SqlInseguro(
+            "A consulta usa a tabela notas mas não menciona situacao -- declare "
+            "explicitamente se deve incluir ou excluir notas canceladas."
+        )
+
     if not _REGEX_LIMIT.search(sql_limpo):
         sql_limpo = f"{sql_limpo} LIMIT {LIMIT_PADRAO}"
 

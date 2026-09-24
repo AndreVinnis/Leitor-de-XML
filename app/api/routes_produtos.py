@@ -13,6 +13,7 @@ from app.models.models import (
     LogAuditoria,
     Nota,
     ProdutoCanonico,
+    SituacaoNota,
     StatusRevisao,
     SugestaoNormalizacao,
     TipoNota,
@@ -61,11 +62,15 @@ async def listar_canonicos(
     """
     db: Session = SessionLocal()
     try:
+        # Item de nota cancelada não conta como vínculo -- é exatamente o
+        # tipo de "prova" que a situação da nota existe para invalidar.
         contagem_itens = (
             db.query(
                 ItemNota.produto_canonico_id.label("produto_canonico_id"),
                 func.count(ItemNota.id).label("total_itens"),
             )
+            .join(Nota, Nota.id == ItemNota.nota_id)
+            .filter(Nota.situacao == SituacaoNota.AUTORIZADA)
             .group_by(ItemNota.produto_canonico_id)
             .subquery()
         )
@@ -161,6 +166,7 @@ async def listar_itens_vinculados(
                 "tipo": nota.tipo.value,
                 "fornecedor": nota.emitente_nome,
                 "data_emissao": nota.data_emissao,
+                "situacao_nota": nota.situacao.value if nota.situacao is not None else None,
                 "descricao_original": item.descricao_original,
                 # Decimal serializado como string, não float: é dinheiro/quantidade
                 # (mesma convenção de app/api/routes_notas.py).
@@ -415,6 +421,7 @@ async def listar_sugestoes(
                 "nome_canonico": canonico.nome_canonico,
                 "categoria": canonico.categoria,
                 "fornecedor": nota.emitente_nome,
+                "situacao_nota": nota.situacao.value if nota.situacao is not None else None,
                 "confianca": float(sugestao.confianca),
                 "status": sugestao.status.value,
                 "criado_em": sugestao.criado_em,

@@ -18,6 +18,7 @@ const STATUS_PARA_BADGE: Record<StatusNota, StatusBadge> = {
   pendente: "pendente",
   erro: "erro",
   duplicado: "neutro",
+  evento: "evento",
 };
 
 const OPCOES_STATUS: { valor: StatusNota | ""; rotulo: string }[] = [

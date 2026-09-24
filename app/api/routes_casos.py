@@ -7,6 +7,7 @@ from app.models.models import (
     AchadoReconciliacao,
     ArquivoLote,
     ClienteCaso,
+    EventoNFe,
     ItemNota,
     LogAuditoria,
     Lote,
@@ -100,10 +101,11 @@ async def excluir_caso(
     admin: Usuario = Depends(requer_administrador),
 ):
     """Exclui um cliente/caso e tudo que depende dele -- notas, itens,
-    sugestões de normalização, produtos canônicos, achados de reconciliação
-    e lotes de upload (essas duas últimas não foram pedidas explicitamente,
-    mas têm FK obrigatória para clientes_casos, então precisam ser limpas
-    também ou o delete do caso quebra com IntegrityError). logs_auditoria
+    sugestões de normalização, produtos canônicos, achados de reconciliação,
+    eventos de NF-e e lotes de upload (essas últimas não foram pedidas
+    explicitamente, mas têm FK obrigatória para clientes_casos, então
+    precisam ser limpas também ou o delete do caso quebra com
+    IntegrityError). logs_auditoria
     nunca é tocado -- não referencia cliente_caso_id."""
     db: Session = SessionLocal()
     try:
@@ -149,6 +151,12 @@ async def excluir_caso(
             db.query(ArquivoLote).filter(ArquivoLote.lote_id.in_(lote_ids)).delete(
                 synchronize_session=False
             )
+
+        # eventos_nfe tem FK para notas.id (nullable) -- precisa ser limpo
+        # antes do delete de Nota, senão a FK barra o delete.
+        db.query(EventoNFe).filter(EventoNFe.cliente_caso_id == caso_id).delete(
+            synchronize_session=False
+        )
 
         if nota_ids:
             db.query(ItemNota).filter(ItemNota.nota_id.in_(nota_ids)).delete(

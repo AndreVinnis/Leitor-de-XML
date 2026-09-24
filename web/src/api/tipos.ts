@@ -33,7 +33,7 @@ export interface EstatisticasDashboard {
   erros: number;
 }
 
-export type StatusNota = "pendente" | "sucesso" | "erro" | "duplicado";
+export type StatusNota = "pendente" | "sucesso" | "erro" | "duplicado" | "evento";
 
 export type TipoNota = "entrada" | "saida";
 

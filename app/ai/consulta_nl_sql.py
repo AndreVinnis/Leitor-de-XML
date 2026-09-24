@@ -42,7 +42,8 @@ somente leitura (SELECT). Use exclusivamente estas tabelas e colunas:
 
 - notas (id, chave_acesso, tipo ['entrada'|'saida'], numero, serie, \
 data_emissao, emitente_cnpj, emitente_nome, destinatario_cnpj, \
-destinatario_nome, valor_total, cliente_caso_id, arquivo_origem, criado_em)
+destinatario_nome, valor_total, cliente_caso_id, arquivo_origem, \
+situacao ['autorizada'|'cancelada'], cancelada_em, criado_em)
 - itens_nota (id, nota_id, numero_item, codigo_produto, descricao_original, \
 ncm, cfop, unidade, quantidade, valor_unitario, valor_total, \
 produto_canonico_id)
@@ -56,6 +57,10 @@ comando que não seja leitura.
 - Sempre filtre por notas.cliente_caso_id = :cliente_caso_id -- escreva \
 literalmente o placeholder nomeado ":cliente_caso_id" (nunca um número), o \
 valor real é injetado depois pelo backend.
+- Nota com situacao = 'cancelada' não vale mais e não deve entrar em soma, \
+contagem ou qualquer agregação de valor: sempre filtre \
+notas.situacao = 'autorizada', a menos que a pergunta peça explicitamente \
+por notas canceladas ou pelo histórico de cancelamentos.
 - Para perguntas sobre um produto, faça JOIN de itens_nota com \
 produtos_canonicos (por produto_canonico_id) e/ou notas (por nota_id) \
 conforme necessário para responder quantidade, valor total, preço e \

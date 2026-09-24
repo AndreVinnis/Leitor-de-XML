@@ -7,6 +7,7 @@ from app.models.models import (
     Lote,
     Nota,
     RoleUsuario,
+    SituacaoNota,
     StatusCadastro,
     StatusProcessamento,
     TipoNota,
@@ -49,6 +50,7 @@ def _criar_nota(
     tipo=TipoNota.ENTRADA,
     destinatario_nome=None,
     data_emissao=datetime(2024, 5, 10),
+    situacao=SituacaoNota.AUTORIZADA,
 ):
     nota = Nota(
         chave_acesso=chave,
@@ -59,6 +61,7 @@ def _criar_nota(
         valor_total=valor_total,
         cliente_caso_id=caso_id,
         data_emissao=data_emissao,
+        situacao=situacao,
     )
     session.add(nota)
     session.commit()
@@ -165,6 +168,32 @@ def test_listar_notas_filtra_por_tipo(client, db_session_factory, logar_usuario)
     assert corpo["itens"][0]["numero"] == "6"
 
 
+def test_listar_notas_filtra_por_situacao(client, db_session_factory, logar_usuario):
+    from datetime import datetime as _dt
+
+    session = db_session_factory()
+    usuario = _criar_usuario(session)
+    caso = _criar_caso(session)
+    _criar_nota(session, caso.id, chave="5" * 44, numero="5")
+    cancelada = _criar_nota(session, caso.id, chave="6" * 44, numero="6")
+    cancelada.situacao = SituacaoNota.CANCELADA
+    cancelada.cancelada_em = _dt(2024, 6, 1)
+    session.commit()
+    session.close()
+    logar_usuario(usuario)
+
+    resp = client.get(f"/api/notas?cliente_caso_id={caso.id}&situacao=cancelada")
+    assert resp.status_code == 200
+    corpo = resp.json()
+    assert corpo["total"] == 1
+    assert corpo["itens"][0]["numero"] == "6"
+    assert corpo["itens"][0]["situacao"] == "cancelada"
+
+    resp_todas = client.get(f"/api/notas?cliente_caso_id={caso.id}")
+    assert resp_todas.status_code == 200
+    assert resp_todas.json()["total"] == 2
+
+
 def test_listar_notas_busca_textual_por_numero_chave_ou_emitente(client, db_session_factory, logar_usuario):
     session = db_session_factory()
     usuario = _criar_usuario(session)
@@ -238,6 +267,8 @@ def test_obter_nota_com_itens(client, db_session_factory, logar_usuario):
     assert resp.status_code == 200
     corpo = resp.json()
     assert corpo["id"] == nota_id
+    assert corpo["situacao"] == "autorizada"
+    assert corpo["cancelada_em"] is None
     assert len(corpo["itens"]) == 1
     assert corpo["itens"][0]["descricao_original"] == "ARROZ TIO JOAO 5KG"
 

@@ -28,6 +28,10 @@ def _sem_broker_de_verdade(monkeypatch):
     monkeypatch.setattr(
         "app.api.routes_auth.enviar_notificacao_resultado_cadastro", MagicMock()
     )
+    # _atualizar_status_arquivo_lote dispara aplicar_eventos_pendentes.delay(...)
+    # assim que o último ArquivoLote de um lote termina -- qualquer teste que
+    # processe um lote até o fim bateria nisso, mesmo sem tocar em eventos.
+    monkeypatch.setattr("app.workers.tasks.aplicar_eventos_pendentes.delay", MagicMock())
 
 
 @pytest.fixture(autouse=True)

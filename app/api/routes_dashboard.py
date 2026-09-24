@@ -26,11 +26,13 @@ async def estatisticas(
         notas_processadas = query.filter(ArquivoLote.status == StatusProcessamento.SUCESSO).count()
         pendentes = query.filter(ArquivoLote.status == StatusProcessamento.PENDENTE).count()
         erros = query.filter(ArquivoLote.status == StatusProcessamento.ERRO).count()
+        eventos = query.filter(ArquivoLote.status == StatusProcessamento.EVENTO).count()
 
         return {
             "notas_processadas": notas_processadas,
             "pendentes": pendentes,
             "erros": erros,
+            "eventos": eventos,
         }
     finally:
         db.close()
