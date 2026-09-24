@@ -70,8 +70,29 @@ class NotaNFeDTO:
     tipo: Optional[str] = None  # definido depois: 'entrada' ou 'saida', conforme CNPJ do cliente
 
 
-def _text(node, xpath: str) -> Optional[str]:
-    result = node.find(xpath, namespaces=NFE_NS)
+def _find(node, tag: str):
+    """Busca um filho direto por tag, tentando o namespace padrão da NF-e e,
+    se não achar, sem namespace algum -- alguns exportadores de terceiros
+    remontam o XML e descartam o xmlns default, mesmo a tag existindo."""
+    if node is None:
+        return None
+    result = node.find(f"nfe:{tag}", namespaces=NFE_NS)
+    if result is None:
+        result = node.find(tag)
+    return result
+
+
+def _findall(node, tag: str):
+    if node is None:
+        return []
+    results = node.findall(f"nfe:{tag}", namespaces=NFE_NS)
+    if not results:
+        results = node.findall(tag)
+    return results
+
+
+def _text(node, tag: str) -> Optional[str]:
+    result = _find(node, tag)
     if result is not None and result.text:
         return result.text.strip()
     return None
@@ -110,6 +131,8 @@ def parse_nfe_xml(xml_path: str | Path) -> NotaNFeDTO:
     root = tree.getroot()
     inf_nfe = root.find(".//nfe:infNFe", namespaces=NFE_NS)
     if inf_nfe is None:
+        inf_nfe = root.find(".//infNFe")
+    if inf_nfe is None:
         raise NFeParseError(f"Não foi encontrado <infNFe> em {xml_path.name} — não parece ser uma NF-e.")
 
     chave = inf_nfe.get("Id", "")
@@ -117,40 +140,40 @@ def parse_nfe_xml(xml_path: str | Path) -> NotaNFeDTO:
     if not chave_acesso:
         raise NFeParseError(f"Chave de acesso ausente em {xml_path.name}.")
 
-    ide = inf_nfe.find("nfe:ide", namespaces=NFE_NS)
-    emit = inf_nfe.find("nfe:emit", namespaces=NFE_NS)
-    dest = inf_nfe.find("nfe:dest", namespaces=NFE_NS)
-    total = inf_nfe.find("nfe:total/nfe:ICMSTot", namespaces=NFE_NS)
+    ide = _find(inf_nfe, "ide")
+    emit = _find(inf_nfe, "emit")
+    dest = _find(inf_nfe, "dest")
+    total = _find(_find(inf_nfe, "total"), "ICMSTot")
 
     itens: list[ItemNFeDTO] = []
-    for det in inf_nfe.findall("nfe:det", namespaces=NFE_NS):
-        prod = det.find("nfe:prod", namespaces=NFE_NS)
+    for det in _findall(inf_nfe, "det"):
+        prod = _find(det, "prod")
         if prod is None:
             continue
         itens.append(
             ItemNFeDTO(
                 numero_item=int(det.get("nItem")) if det.get("nItem") else None,
-                codigo_produto=_text(prod, "nfe:cProd"),
-                descricao_original=_text(prod, "nfe:xProd") or "",
-                ncm=_text(prod, "nfe:NCM"),
-                cfop=_text(prod, "nfe:CFOP"),
-                unidade=_text(prod, "nfe:uCom"),
-                quantidade=_decimal(_text(prod, "nfe:qCom")),
-                valor_unitario=_decimal(_text(prod, "nfe:vUnCom")),
-                valor_total=_decimal(_text(prod, "nfe:vProd")),
+                codigo_produto=_text(prod, "cProd"),
+                descricao_original=_text(prod, "xProd") or "",
+                ncm=_text(prod, "NCM"),
+                cfop=_text(prod, "CFOP"),
+                unidade=_text(prod, "uCom"),
+                quantidade=_decimal(_text(prod, "qCom")),
+                valor_unitario=_decimal(_text(prod, "vUnCom")),
+                valor_total=_decimal(_text(prod, "vProd")),
             )
         )
 
     return NotaNFeDTO(
         chave_acesso=chave_acesso,
-        numero=_text(ide, "nfe:nNF") if ide is not None else None,
-        serie=_text(ide, "nfe:serie") if ide is not None else None,
-        data_emissao=_parse_data_emissao(_text(ide, "nfe:dhEmi") if ide is not None else None),
-        emitente_cnpj=_text(emit, "nfe:CNPJ") if emit is not None else None,
-        emitente_nome=_text(emit, "nfe:xNome") if emit is not None else None,
-        destinatario_cnpj=_text(dest, "nfe:CNPJ") if dest is not None else None,
-        destinatario_nome=_text(dest, "nfe:xNome") if dest is not None else None,
-        valor_total=_decimal(_text(total, "nfe:vNF") if total is not None else None),
+        numero=_text(ide, "nNF"),
+        serie=_text(ide, "serie"),
+        data_emissao=_parse_data_emissao(_text(ide, "dhEmi")),
+        emitente_cnpj=_text(emit, "CNPJ"),
+        emitente_nome=_text(emit, "xNome"),
+        destinatario_cnpj=_text(dest, "CNPJ"),
+        destinatario_nome=_text(dest, "xNome"),
+        valor_total=_decimal(_text(total, "vNF")),
         itens=itens,
     )
 
