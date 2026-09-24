@@ -3,6 +3,7 @@ from enum import Enum
 
 from fastapi_users.db import SQLAlchemyBaseUserTable
 from sqlalchemy import (
+    Boolean,
     Column,
     DateTime,
     Enum as SAEnum,
@@ -24,6 +25,11 @@ class TipoNota(str, Enum):
     SAIDA = "saida"
 
 
+class SituacaoNota(str, Enum):
+    AUTORIZADA = "autorizada"
+    CANCELADA = "cancelada"
+
+
 class Nota(Base):
     """Uma NF-e (cabeçalho). 1 XML = 1 registro aqui."""
 
@@ -43,6 +49,12 @@ class Nota(Base):
     valor_total = Column(Numeric(14, 2), nullable=True)
     cliente_caso_id = Column(Integer, ForeignKey("clientes_casos.id"), nullable=True, index=True)
     arquivo_origem = Column(String(500), nullable=True)  # nome do XML original
+    # Default AUTORIZADA: só o evento de cancelamento (tpEvento 110111,
+    # registrado pelo Sefaz) muda para CANCELADA -- ver app/workers/tasks.py.
+    # Reconciliação e qualquer soma/contagem de valor devem filtrar por
+    # AUTORIZADA, senão nota cancelada infla o lado entrada ou saída.
+    situacao = Column(SAEnum(SituacaoNota), nullable=False, default=SituacaoNota.AUTORIZADA, index=True)
+    cancelada_em = Column(DateTime, nullable=True)
     criado_em = Column(DateTime, default=datetime.utcnow)
 
     itens = relationship("ItemNota", back_populates="nota", cascade="all, delete-orphan")
@@ -187,6 +199,10 @@ class StatusProcessamento(str, Enum):
     SUCESSO = "sucesso"
     ERRO = "erro"
     DUPLICADO = "duplicado"
+    # Arquivo era um evento de NF-e (cancelamento, carta de correção etc.),
+    # não uma nota -- não pode reusar SUCESSO, ou o card "Notas processadas"
+    # do dashboard contaria evento como nota (ver app/api/routes_dashboard.py).
+    EVENTO = "evento"
 
 
 class Lote(Base):
@@ -231,6 +247,55 @@ class ArquivoLote(Base):
     criado_em = Column(DateTime, default=datetime.utcnow)
 
     lote = relationship("Lote", back_populates="arquivos")
+
+
+class EventoNFe(Base):
+    """
+    Um evento de NF-e (cancelamento, carta de correção, manifestação do
+    destinatário etc.) -- XML separado do XML da nota, vinculado a ela pela
+    chave de acesso. Guarda TODO evento que chegar, mesmo sem a Nota
+    correspondente ainda existir (nota_id fica nulo até a nota ser
+    importada) e mesmo quando o Sefaz rejeitou o evento (cstat fora de
+    {135, 136, 155}) -- só o worker decide se o efeito é aplicado.
+
+    Não referencia ArquivoLote.nota_id: um arquivo de evento nunca preenche
+    esse campo (ver app/workers/tasks.py), então o rastro do arquivo que
+    originou o evento vive aqui, em arquivo_lote_id.
+    """
+
+    __tablename__ = "eventos_nfe"
+    __table_args__ = (
+        UniqueConstraint(
+            "cliente_caso_id",
+            "chave_acesso",
+            "tipo_evento",
+            "numero_sequencia",
+            "cstat",
+            name="uq_evento_caso_chave_tipo_seq_cstat",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    cliente_caso_id = Column(Integer, ForeignKey("clientes_casos.id"), nullable=False, index=True)
+    chave_acesso = Column(String(44), nullable=False, index=True)
+    tipo_evento = Column(String(6), nullable=False, index=True)
+    numero_sequencia = Column(Integer, nullable=False, default=1)
+    descricao_evento = Column(String(255), nullable=True)
+    data_evento = Column(DateTime, nullable=True)
+    justificativa = Column(Text, nullable=True)
+    tp_amb = Column(String(1), nullable=True)
+    protocolo = Column(String(20), nullable=True)
+    # String(3) do cStat do retEvento -- NUNCA gravado como NULL (worker
+    # normaliza para "" quando não há retEvento ainda), porque MySQL/SQLite
+    # não aplicam UNIQUE entre linhas com NULL na coluna: um pedido de
+    # cancelamento sem protocolo reenviado várias vezes duplicaria a linha.
+    cstat = Column(String(3), nullable=False, default="")
+    motivo = Column(String(255), nullable=True)
+    nota_id = Column(Integer, ForeignKey("notas.id"), nullable=True, index=True)
+    arquivo_lote_id = Column(Integer, ForeignKey("arquivos_lote.id"), nullable=True)
+    aplicado = Column(Boolean, nullable=False, default=False, index=True)
+    arquivo_origem = Column(String(500), nullable=True)
+    criado_em = Column(DateTime, default=datetime.utcnow)
 
 
 class RoleUsuario(str, Enum):

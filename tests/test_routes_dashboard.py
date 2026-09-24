@@ -57,6 +57,7 @@ def test_estatisticas_dashboard_filtra_por_caso(client, db_session_factory, loga
             ArquivoLote(
                 lote_id=lote.id, nome_arquivo="d.xml", status=StatusProcessamento.ERRO, motivo_erro="x"
             ),
+            ArquivoLote(lote_id=lote.id, nome_arquivo="evento.xml", status=StatusProcessamento.EVENTO),
         ]
     )
 
@@ -76,7 +77,7 @@ def test_estatisticas_dashboard_filtra_por_caso(client, db_session_factory, loga
 
     resp = client.get(f"/api/dashboard/estatisticas?cliente_caso_id={caso.id}")
     assert resp.status_code == 200
-    assert resp.json() == {"notas_processadas": 2, "pendentes": 1, "erros": 1}
+    assert resp.json() == {"notas_processadas": 2, "pendentes": 1, "erros": 1, "eventos": 1}
 
     resp_geral = client.get("/api/dashboard/estatisticas")
     assert resp_geral.status_code == 200

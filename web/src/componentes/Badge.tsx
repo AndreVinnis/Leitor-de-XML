@@ -1,6 +1,6 @@
 import estilos from "./Badge.module.css";
 
-export type StatusBadge = "sucesso" | "pendente" | "erro" | "neutro" | "info";
+export type StatusBadge = "sucesso" | "pendente" | "erro" | "neutro" | "info" | "evento";
 
 const ROTULOS: Record<StatusBadge, string> = {
   sucesso: "Processada",
@@ -8,6 +8,7 @@ const ROTULOS: Record<StatusBadge, string> = {
   erro: "Erro",
   neutro: "Duplicado",
   info: "Info",
+  evento: "Evento",
 };
 
 export function Badge({ status, rotulo }: { status: StatusBadge; rotulo?: string }) {

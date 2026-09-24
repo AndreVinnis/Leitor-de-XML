@@ -70,10 +70,16 @@ def test_consulta_caminho_feliz_executa_sql_e_grava_log(
     session.close()
     logar_usuario(usuario)
 
+    # SQLite (usado nesta suíte) compara string com case sensitivo; MySQL
+    # (produção) usa collation case-insensitive por padrão. SAEnum grava o
+    # NOME do membro em maiúsculo (AUTORIZADA), não o valor Python
+    # ("autorizada") -- daí o literal aqui precisar do case exato para bater
+    # em SQLite, mesmo a IA normalmente gerando em minúsculo (funciona igual
+    # em produção, graças à collation do MySQL).
     sql_fixo = (
         "SELECT n.id, i.descricao_original, i.valor_total FROM notas n "
         "JOIN itens_nota i ON i.nota_id = n.id "
-        "WHERE n.cliente_caso_id = :cliente_caso_id"
+        "WHERE n.cliente_caso_id = :cliente_caso_id AND n.situacao = 'AUTORIZADA'"
     )
     chamadas = []
 

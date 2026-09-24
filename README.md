@@ -102,19 +102,27 @@ camada de NL→SQL ainda precisam ser implementados.
    inteiro no prompt (ver `app/ai/embeddings.py` e
    `app/workers/tasks.py::normalizar_produtos_pendentes`). Sem MySQL 9 e
    sem banco vetorial dedicado.
-2. **Motor de reconciliação**: lógica pura que cruza entradas x saídas
+2. ~~Eventos de NF-e (cancelamento, carta de correção, manifestação)~~ —
+   **implementado**: `app/parsers/evento_parser.py` lê o XML de evento
+   (formato diferente do XML da nota) e `app/workers/tasks.py` persiste
+   todo evento em `EventoNFe`, com cancelamento (`tpEvento 110111`,
+   homologado pelo Sefaz) marcando `Nota.situacao = cancelada`. Ver
+   CLAUDE.md, seção "Eventos de NF-e", para o contrato completo (evento
+   órfão, guarda de `cStat`/`tpAmb`, invariante de concorrência).
+3. **Motor de reconciliação**: lógica pura que cruza entradas x saídas
    por `produto_canonico_id`, calcula saldo e gera `AchadoReconciliacao`.
-   Ainda não implementado.
-3. **Normalização de produtos via IA**: agrupar `descricao_original`
+   Ainda não implementado. Precisa filtrar `Nota.situacao = autorizada`,
+   senão nota cancelada infla o lado entrada ou saída.
+4. **Normalização de produtos via IA**: agrupar `descricao_original`
    parecidas em um `ProdutoCanonico`, gerando `SugestaoNormalizacao` com
    nível de confiança, para revisão humana obrigatória.
-4. **Camada NL→SQL**: endpoint que recebe pergunta em linguagem natural,
+5. **Camada NL→SQL**: endpoint que recebe pergunta em linguagem natural,
    usa Claude para gerar SQL, valida contra whitelist de
    tabelas/colunas, executa em conexão somente-leitura, registra em
    `logs_auditoria`.
-5. **Camada de explicação**: resumir achados de reconciliação em texto
+6. **Camada de explicação**: resumir achados de reconciliação em texto
    para o advogado, sem tirar conclusões jurídicas.
-6. **Controle de acesso por cliente/caso** — login e cadastro com
+7. **Controle de acesso por cliente/caso** — login e cadastro com
    aprovação já existem (item acima), mas `cliente_caso_id` ainda é
    aceito nas rotas de notas/produtos sem checar se o usuário logado tem
    permissão sobre aquele cliente/caso.

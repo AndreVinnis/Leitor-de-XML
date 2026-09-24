@@ -5,6 +5,7 @@ from app.models.models import (
     Nota,
     ProdutoCanonico,
     RoleUsuario,
+    SituacaoNota,
     StatusCadastro,
     TipoNota,
     Usuario,
@@ -268,6 +269,56 @@ def test_listar_canonicos_devolve_envelope_com_contagem_de_itens(
     por_nome = {item["nome_canonico"]: item for item in corpo["itens"]}
     assert por_nome["Coca-Cola"]["itens_vinculados_count"] == 2
     assert por_nome["Caderno"]["itens_vinculados_count"] == 0
+
+
+def test_listar_canonicos_nao_conta_item_de_nota_cancelada(
+    client, db_session_factory, logar_usuario
+):
+    """Item de nota cancelada não pode contar como vínculo -- é exatamente
+    a "prova" que a situação da nota existe para invalidar."""
+    session = db_session_factory()
+    usuario = _criar_usuario(session)
+    caso = _criar_caso(session)
+    canonico = ProdutoCanonico(cliente_caso_id=caso.id, nome_canonico="Coca-Cola", categoria="Bebidas")
+    session.add(canonico)
+    session.commit()
+    session.refresh(canonico)
+
+    nota_autorizada = Nota(chave_acesso="1" * 44, tipo=TipoNota.ENTRADA, cliente_caso_id=caso.id)
+    nota_cancelada = Nota(
+        chave_acesso="2" * 44,
+        tipo=TipoNota.ENTRADA,
+        cliente_caso_id=caso.id,
+        situacao=SituacaoNota.CANCELADA,
+    )
+    session.add_all([nota_autorizada, nota_cancelada])
+    session.commit()
+    session.refresh(nota_autorizada)
+    session.refresh(nota_cancelada)
+    session.add_all(
+        [
+            ItemNota(
+                nota_id=nota_autorizada.id,
+                descricao_original="COCA 350ML",
+                produto_canonico_id=canonico.id,
+            ),
+            ItemNota(
+                nota_id=nota_cancelada.id,
+                descricao_original="COCA 2L",
+                produto_canonico_id=canonico.id,
+            ),
+        ]
+    )
+    session.commit()
+    session.close()
+    logar_usuario(usuario)
+
+    resp = client.get("/api/produtos/canonicos", params={"cliente_caso_id": caso.id})
+
+    assert resp.status_code == 200
+    corpo = resp.json()
+    por_nome = {item["nome_canonico"]: item for item in corpo["itens"]}
+    assert por_nome["Coca-Cola"]["itens_vinculados_count"] == 1  # só o item da nota autorizada
 
 
 def test_listar_canonicos_filtra_por_categoria_e_busca(client, db_session_factory, logar_usuario):
