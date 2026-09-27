@@ -325,6 +325,7 @@ def _montar_caso_com_dados_relacionados(session, cliente_caso_id):
         cstat="135",
         aplicado=True,
         nota_id=nota.id,
+        arquivo_lote_id=arquivo.id,
     )
     session.add(evento)
     session.commit()
