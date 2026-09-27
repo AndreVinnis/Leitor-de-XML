@@ -54,11 +54,31 @@ Você normaliza descrições de produtos extraídas de notas fiscais eletrônica
 a um produto canônico já existente (informe produto_canonico_id) ou se \
 representa um produto novo (preencha novo_produto_canonico com um nome \
 canônico limpo e, se possível, uma categoria). Nunca invente um \
-produto_canonico_id que não esteja na lista de canônicos existentes. Uma \
-descrição corresponde ao mesmo produto canônico mesmo com pequenas variações \
-de grafia, acentuação, abreviação ou espaçamento -- mas produtos com \
-quantidade/tamanho diferentes (ex: 1KG vs 5KG) são produtos distintos. Informe \
-confianca entre 0 e 1 refletindo sua certeza no agrupamento."""
+produto_canonico_id que não esteja na lista de canônicos existentes. Informe \
+confianca entre 0 e 1 refletindo sua certeza no agrupamento.
+
+O nome canônico deve ser o mais genérico possível, mantendo apenas os \
+atributos que de fato diferenciam produtos para fins de reconciliação de \
+estoque. Três atributos SEMPRE diferenciam produtos, mesmo com o restante da \
+descrição idêntico:
+
+1. Parte, tipo ou categoria do item (ex: peito de frango, coxa de frango e \
+sobrecoxa de frango são produtos DIFERENTES entre si -- nunca agrupe partes \
+distintas de um mesmo animal ou variantes de tipo em um único canônico).
+2. Marca/fabricante, quando aparecer na descrição (ex: "peito de frango 1kg \
+sadia" e "peito de frango 1kg perdigão" são produtos DIFERENTES).
+3. Quantidade, peso ou volume (ex: "cerveja stella 350ml" e "cerveja stella \
+600ml" são produtos DIFERENTES; "arroz 1kg" e "arroz 5kg" são produtos \
+DIFERENTES).
+
+Fora desses três atributos, ignore variações de preparo, corte ou manuseio ao \
+decidir se é o mesmo produto -- elas não criam um canônico novo. Por exemplo, \
+"peito de frango sem pele 1kg" e "peito de frango desossado 1kg" são o MESMO \
+produto e devem virar o canônico "peito de frango 1kg" (termos como sem pele, \
+com/sem osso, desossado, resfriado, congelado, in natura, a granel ou \
+embalado descrevem a mesma mercadoria, não produtos distintos). O mesmo vale \
+para pequenas variações de grafia, acentuação, abreviação ou espaçamento, que \
+nunca justificam um canônico novo."""
 
 
 def sugerir_normalizacao(
