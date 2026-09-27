@@ -1,13 +1,21 @@
 """
-Tradução de pergunta em linguagem natural para SQL somente leitura (RF-006).
+Tradução de pergunta em linguagem natural para um plano de consulta SQL
+somente leitura (RF-006).
 
-O SQL devolvido aqui NUNCA é executado diretamente -- ele ainda passa por
+Nenhum SQL devolvido aqui é executado diretamente -- cada um ainda passa por
 app/core/sql_seguranca.py::validar_e_finalizar_sql antes de qualquer contato
-com o banco (RNF-003). Este módulo só decide o texto do SQL; quem decide se
-ele roda é a validação determinística, não a IA.
+com o banco (RNF-003). Este módulo só decide o texto do(s) SQL(s) e o modelo
+de frase-resposta; quem decide se cada SQL roda é a validação determinística,
+e quem decide o valor que preenche cada marcador da frase é
+app/core/resposta_consulta.py -- a IA não escreve o número final diretamente
+na frase, ela escreve o SQL que o produz e um marcador; app/api/routes_consulta.py
+e app/core/resposta_consulta.py são quem valida a estrutura do plano (consulta
+"resposta" precisa devolver 1 linha só, marcador só pode ler de "resposta"
+etc.) antes de aceitar o valor.
 """
 
-from typing import Optional
+from dataclasses import dataclass
+from typing import Literal, Optional
 
 from google import genai
 from google.genai import types
@@ -17,6 +25,9 @@ from app.ai.gemini_retry import retry_gemini
 from app.core.config import settings
 
 _client: Optional[genai.Client] = None
+
+FINALIDADES_VALIDAS = {"resposta", "fontes", "listagem"}
+MAX_CONSULTAS = 3
 
 
 def _get_client() -> genai.Client:
@@ -31,13 +42,31 @@ def _gerar_conteudo(client: genai.Client, **kwargs) -> types.GenerateContentResp
     return client.models.generate_content(**kwargs)
 
 
-class _RespostaConsulta(BaseModel):
+class _ConsultaPlanejada(BaseModel):
+    finalidade: Literal["resposta", "fontes", "listagem"]
     sql: str
+
+
+class _PlanoConsultaResposta(BaseModel):
+    consultas: list[_ConsultaPlanejada]
+    resposta_modelo: Optional[str] = None
+
+
+@dataclass
+class ConsultaPlanejada:
+    finalidade: str
+    sql: str
+
+
+@dataclass
+class PlanoConsulta:
+    consultas: list[ConsultaPlanejada]
+    resposta_modelo: Optional[str]
 
 
 _SYSTEM_PROMPT = """\
 Você traduz perguntas em linguagem natural, feitas por advogados sobre notas \
-fiscais eletrônicas (NF-e) já processadas, para uma única consulta SQL \
+fiscais eletrônicas (NF-e) já processadas, para um plano de consultas SQL \
 somente leitura (SELECT). Use exclusivamente estas tabelas e colunas:
 
 - notas (id, chave_acesso, tipo ['entrada'|'saida'], numero, serie, \
@@ -50,8 +79,8 @@ produto_canonico_id)
 - produtos_canonicos (id, cliente_caso_id, nome_canonico, categoria, \
 criado_em)
 
-Regras obrigatórias, sem exceção:
-- Escreva exatamente um comando, e ele deve ser um SELECT.
+Regras obrigatórias para CADA consulta do plano, sem exceção:
+- Escreva exatamente um comando por consulta, e ele deve ser um SELECT.
 - Nunca use INSERT, UPDATE, DELETE, DROP, ALTER, CREATE ou qualquer outro \
 comando que não seja leitura.
 - Sempre filtre por notas.cliente_caso_id = :cliente_caso_id -- escreva \
@@ -65,10 +94,49 @@ por notas canceladas ou pelo histórico de cancelamentos.
 produtos_canonicos (por produto_canonico_id) e/ou notas (por nota_id) \
 conforme necessário para responder quantidade, valor total, preço e \
 categoria.
-- Quando a resposta listar notas ou itens individuais (sem agregação como \
-SUM/COUNT/GROUP BY), inclua sempre a coluna "notas.id AS nota_id" -- o \
-usuário usa esse id para baixar os XMLs. Em consultas agregadas, não inclua.
 - Não use nenhuma tabela ou coluna fora da lista acima.
+
+Como decidir o formato do plano (campo "consultas", uma lista):
+1. Pergunta de LISTAGEM (o usuário quer ver notas ou itens individuais, não \
+um número agregado, ex.: "quais notas...", "liste os itens..."): devolva \
+exatamente 1 consulta com finalidade "listagem", incluindo sempre a coluna \
+"notas.id AS nota_id" (o usuário usa esse id para baixar os XMLs), e deixe \
+resposta_modelo nulo.
+2. Pergunta OBJETIVA (o usuário quer um número, total ou contagem, ex.: \
+"quantos itens...", "qual o valor total..."): devolva 1 consulta com \
+finalidade "resposta" (agregada, com SUM/COUNT/etc., e um alias de coluna \
+claro, ex. "SELECT SUM(i.quantidade) AS total_itens FROM ..."), seguida de \
+exatamente 1 consulta com finalidade "fontes" que usa OS MESMOS FILTROS da \
+consulta "resposta" mas SEM agregação, listando as notas/itens individuais \
+que entraram no cálculo -- sempre com "notas.id AS nota_id", número da nota, \
+data de emissão, emitente e destinatário, e (quando a pergunta for sobre um \
+produto) descrição, quantidade e valor do item. No máximo 3 consultas no \
+total. A consulta "resposta" tem que devolver SEMPRE exatamente uma linha: \
+nunca use GROUP BY nela (se a pergunta pedir totais separados por grupo, ex. \
+"quanto entrou e quanto saiu", isso não é uma pergunta objetiva de um único \
+número -- trate como listagem, com finalidade "listagem" e sem \
+resposta_modelo), e nunca repita o mesmo alias de coluna duas vezes.
+3. Preencha resposta_modelo (só quando houver consulta "resposta" -- se não \
+houver consulta "resposta" no plano, deixe resposta_modelo nulo) com uma \
+frase curta em português, natural, respondendo à pergunta, usando \
+marcadores no formato {N.coluna} ou {N.coluna|formato} no lugar de QUALQUER \
+número, valor monetário ou data -- N é a posição da consulta "resposta" no \
+array "consultas" (a primeira consulta é 1); um marcador NUNCA pode \
+referenciar uma consulta de finalidade "fontes" ou "listagem" (elas listam \
+várias linhas, então ler "a primeira" seria arbitrário). coluna é o alias \
+exato que você deu na consulta "resposta", e formato é um destes três: \
+"numero", "moeda" ou "data" (omita o formato para texto simples). Exemplo: \
+consultas = [{"finalidade": "resposta", "sql": "SELECT SUM(i.quantidade) AS \
+total_itens FROM ..."}, {"finalidade": "fontes", "sql": "..."}], \
+resposta_modelo = "Foram encontrados {1.total_itens|numero} itens do \
+produto Carne nas notas de entrada do caso selecionado." NUNCA escreva um \
+número, valor ou data literal na frase -- todo dado variável tem que vir de \
+um marcador, porque quem preenche o marcador com o valor real do banco é o \
+backend, nunca você. Garanta também que o agregado nunca devolva NULL sem \
+querer (ex.: "SELECT COALESCE(SUM(i.quantidade), 0) AS total_itens ..." em \
+vez de só SUM(...), já que SUM/AVG/MAX/MIN sobre zero linhas correspondentes \
+devolvem NULL, não zero) -- um marcador que recebe NULL do banco é \
+rejeitado e a resposta não é exibida.
 
 Você recebe também a lista de produtos canônicos já cadastrados no caso (id, \
 nome_canonico, categoria) -- são os nomes revisados por humano, e a grafia \
@@ -83,10 +151,12 @@ fiscal. Só recorra a LIKE sobre descricao_original/nome_canonico quando não \
 houver nenhuma correspondência razoável na lista de canônicos."""
 
 
-def gerar_sql(pergunta: str, canonicos_existentes: list[dict]) -> str:
+def gerar_plano_consulta(pergunta: str, canonicos_existentes: list[dict]) -> PlanoConsulta:
     """
-    Chama a IA para traduzir `pergunta` em um SQL bruto (ainda não validado
-    -- ver o aviso no topo do módulo).
+    Chama a IA para traduzir `pergunta` em um plano de até MAX_CONSULTAS SQLs
+    brutos (ainda não validados -- ver o aviso no topo do módulo) mais,
+    quando a pergunta for objetiva, um modelo de frase-resposta com
+    marcadores para o backend preencher.
 
     `canonicos_existentes` é a lista de {"id": int, "nome_canonico": str,
     "categoria": str | None} já cadastrados no caso (mesmo formato usado por
@@ -114,11 +184,17 @@ def gerar_sql(pergunta: str, canonicos_existentes: list[dict]) -> str:
         config=types.GenerateContentConfig(
             system_instruction=_SYSTEM_PROMPT,
             response_mime_type="application/json",
-            response_schema=_RespostaConsulta,
+            response_schema=_PlanoConsultaResposta,
         ),
     )
 
     resposta = response.parsed
     if resposta is None:
-        resposta = _RespostaConsulta.model_validate_json(response.text)
-    return resposta.sql
+        resposta = _PlanoConsultaResposta.model_validate_json(response.text)
+
+    return PlanoConsulta(
+        consultas=[
+            ConsultaPlanejada(finalidade=c.finalidade, sql=c.sql) for c in resposta.consultas
+        ],
+        resposta_modelo=resposta.resposta_modelo,
+    )
