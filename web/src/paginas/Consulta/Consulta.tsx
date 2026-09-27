@@ -171,6 +171,22 @@ export function Consulta() {
         </div>
       )}
 
+      {resultado && resultado.resposta && (
+        <div className={estilos.blocoResposta}>
+          <p className={estilos.rotuloPergunta}>Resposta</p>
+          <p className={estilos.caixaResposta}>{resultado.resposta}</p>
+        </div>
+      )}
+
+      {resultado && resultado.resposta_pretendida && !resultado.resposta && (
+        <div className={estilos.blocoResposta}>
+          <p className={estilos.rotuloPergunta}>Resposta</p>
+          <p className={estilos.avisoRespostaIndisponivel}>
+            Não foi possível montar uma resposta objetiva com segurança para essa pergunta. Confira os resultados abaixo.
+          </p>
+        </div>
+      )}
+
       {resultado && resultado.linhas.length === 0 && (
         <div className={estilos.estadoVazio}>
           <p className={estilos.estadoVazioTitulo}>Nenhum resultado para essa pergunta</p>
@@ -182,6 +198,12 @@ export function Consulta() {
 
       {resultado && resultado.linhas.length > 0 && (
         <Card>
+          {resultado.resposta && <p className={estilos.tituloFontes}>Fontes da resposta</p>}
+          {resultado.fontes_truncadas && (
+            <p className={estilos.avisoTruncado}>
+              Mostrando as primeiras {resultado.total_linhas} linhas -- o resultado completo pode ter mais.
+            </p>
+          )}
           {indiceNotaId >= 0 ? (
             <BarraSelecaoNotas
               selecionadas={selecionadas.size}
@@ -252,6 +274,13 @@ export function Consulta() {
             Próxima página
           </Botao>
         </div>
+      )}
+
+      {resultado && (
+        <details className={estilos.blocoSql}>
+          <summary>SQL executado ({resultado.consultas.length} consulta{resultado.consultas.length === 1 ? "" : "s"})</summary>
+          <pre className={estilos.codigoSql}>{resultado.sql_gerado}</pre>
+        </details>
       )}
 
       {consultando && (
