@@ -9,6 +9,20 @@ leitura como camada extra de defesa. Essa validação já bloqueia comandos de
 escrita antes de chegar no banco, mas criar um usuário MySQL com grant
 SELECT-only é uma mudança de infra fora do escopo deste MVP -- vale fazer
 antes de rodar com dado real de cliente em produção.
+
+Bypasses conhecidos (achados na revisão crítica de 2026-09-26, ver README
+"O que falta" item 8 -- endurecer antes de dado real de cliente):
+- `validar_e_finalizar_sql` só checa que o literal ":cliente_caso_id"
+  *aparece* na query, não que ele de fato filtra: `... WHERE situacao =
+  'autorizada' OR cliente_caso_id = :cliente_caso_id` passa e devolve dados
+  de todos os casos.
+- O placeholder dentro de um comentário SQL também passa na checagem de
+  presença sem filtrar nada, e ainda comenta o `LIMIT` que seria acrescentado
+  em seguida: `... -- :cliente_caso_id`.
+- A exigência de mencionar `situacao` só dispara quando a tabela `notas`
+  aparece em FROM/JOIN. Uma consulta que filtra só `itens_nota` por uma
+  subquery em `produtos_canonicos` (sem JOIN direto em `notas`) escapa dessa
+  checagem e deixa nota cancelada entrar em soma/contagem.
 """
 
 import re
