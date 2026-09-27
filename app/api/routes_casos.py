@@ -147,16 +147,17 @@ async def excluir_caso(
             AchadoReconciliacao.cliente_caso_id == caso_id
         ).delete(synchronize_session=False)
 
+        # eventos_nfe tem FK para notas.id e para arquivos_lote.id (ambas
+        # nullable) -- precisa ser limpo antes do delete de Nota e de
+        # ArquivoLote, senão a FK barra o delete.
+        db.query(EventoNFe).filter(EventoNFe.cliente_caso_id == caso_id).delete(
+            synchronize_session=False
+        )
+
         if lote_ids:
             db.query(ArquivoLote).filter(ArquivoLote.lote_id.in_(lote_ids)).delete(
                 synchronize_session=False
             )
-
-        # eventos_nfe tem FK para notas.id (nullable) -- precisa ser limpo
-        # antes do delete de Nota, senão a FK barra o delete.
-        db.query(EventoNFe).filter(EventoNFe.cliente_caso_id == caso_id).delete(
-            synchronize_session=False
-        )
 
         if nota_ids:
             db.query(ItemNota).filter(ItemNota.nota_id.in_(nota_ids)).delete(

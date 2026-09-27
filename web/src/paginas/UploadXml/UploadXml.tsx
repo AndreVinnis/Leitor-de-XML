@@ -203,7 +203,7 @@ export function UploadXml() {
           <div className={estilos.dropAreaIcone} />
           <span className={estilos.dropAreaTitulo}>Arraste arquivos XML aqui ou clique para selecionar</span>
           <span className={estilos.dropAreaSubtitulo}>Suporta upload em lote de notas fiscais eletrônicas (NF-e)</span>
-          <span className={estilos.dropAreaLimite}>Limite máximo suportado de 500 notas por lote</span>
+          <span className={estilos.dropAreaLimite}>Limite máximo suportado de 999 notas por lote</span>
           <Botao
             type="button"
             variante="secundario"
