@@ -16,7 +16,13 @@ router = APIRouter()
 UPLOAD_DIR = Path("/tmp/nfe_uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-LIMITE_ARQUIVOS_POR_LOTE = 500
+
+# 999 e não 1000: o Starlette tem um teto interno de 1000 arquivos por
+# multipart (proteção contra DoS, embutida em request.form() e não
+# configurável nesta rota porque ela é síncrona de propósito -- ver
+# docstring de upload_notas). Em 1000 esse teto dispara primeiro e devolve
+# um 400 genérico do Starlette em vez da mensagem 422 em PT-BR abaixo.
+LIMITE_ARQUIVOS_POR_LOTE = 999
 
 
 @router.post("/upload")
