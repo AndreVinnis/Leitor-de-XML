@@ -116,16 +116,42 @@ camada de NL→SQL ainda precisam ser implementados.
 4. **Normalização de produtos via IA**: agrupar `descricao_original`
    parecidas em um `ProdutoCanonico`, gerando `SugestaoNormalizacao` com
    nível de confiança, para revisão humana obrigatória.
-5. **Camada NL→SQL**: endpoint que recebe pergunta em linguagem natural,
-   usa Claude para gerar SQL, valida contra whitelist de
-   tabelas/colunas, executa em conexão somente-leitura, registra em
-   `logs_auditoria`.
+5. ~~Camada NL→SQL~~ — **implementado**: `POST /api/consulta` traduz a
+   pergunta em um plano de até 3 SQLs (Gemini), valida cada um contra a
+   whitelist de tabelas/colunas (`app/core/sql_seguranca.py`), executa
+   escopado por `cliente_caso_id` e registra tudo em `logs_auditoria`. Para
+   pergunta objetiva ("quantos itens...", "qual o valor total..."), devolve
+   também uma frase-resposta em PT-BR com os valores preenchidos
+   deterministicamente pelo backend (`app/core/resposta_consulta.py` — a IA
+   nunca escreve o número) e a tabela de fontes (notas/itens) usada no
+   cálculo. Falta conexão de banco somente leitura como camada extra de
+   defesa (ver limitação anotada em `app/core/sql_seguranca.py`).
 6. **Camada de explicação**: resumir achados de reconciliação em texto
    para o advogado, sem tirar conclusões jurídicas.
 7. **Controle de acesso por cliente/caso** — login e cadastro com
    aprovação já existem (item acima), mas `cliente_caso_id` ainda é
    aceito nas rotas de notas/produtos sem checar se o usuário logado tem
    permissão sobre aquele cliente/caso.
+8. **Endurecer `app/core/sql_seguranca.py::validar_e_finalizar_sql`** —
+   revisão crítica (2026-09-26) achou bypasses que o validador atual
+   aprova sem erro:
+   - `... WHERE situacao='autorizada' OR cliente_caso_id = :cliente_caso_id`
+     devolve dados de todos os casos (o validador só exige que o
+     placeholder *apareça* na query, não que ele efetivamente filtre).
+   - `... -- :cliente_caso_id` joga o placeholder para dentro de um
+     comentário SQL (passa na checagem de presença, mas não filtra nada;
+     de quebra comenta também o `LIMIT` que o validador tentaria
+     acrescentar).
+   - Uma consulta que não usa a tabela `notas` diretamente (ex.: filtra
+     `itens_nota` por uma subquery em `produtos_canonicos`) escapa da
+     exigência de mencionar `situacao`, deixando nota cancelada entrar em
+     soma/contagem.
+   - Falta a conexão de banco somente leitura (grant `SELECT`-only) como
+     camada extra de defesa, já anotada como limitação conhecida no
+     docstring do módulo.
+
+   Prioridade alta antes de rodar com dado real de cliente — afeta toda
+   consulta NL→SQL (item 5), não só perguntas objetivas.
 
 ## Estrutura de pastas
 

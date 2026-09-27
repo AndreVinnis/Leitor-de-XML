@@ -236,12 +236,39 @@ export interface ListaItensVinculados {
 
 // -- Consulta (app/api/routes_consulta.py) --------------------------------
 
-export interface ResultadoConsulta {
-  pergunta: string;
-  sql_gerado: string;
+export type FinalidadeConsultaSql = "resposta" | "fontes" | "listagem";
+
+export interface ConsultaExecutada {
+  finalidade: FinalidadeConsultaSql;
+  sql: string;
   colunas: string[];
   linhas: unknown[][];
   total_linhas: number;
+  /** true quando total_linhas bateu no LIMIT da consulta -- pode haver mais linhas além das exibidas. */
+  truncado: boolean;
+}
+
+export interface ResultadoConsulta {
+  pergunta: string;
+  /** Frase de resposta em PT-BR com os valores já preenchidos pelo backend
+   * (app/core/resposta_consulta.py) -- nula quando a pergunta é de listagem
+   * ou quando o modelo devolvido pela IA não pôde ser montado com segurança. */
+  resposta: string | null;
+  /** true quando o plano da IA pretendia uma frase-resposta (pergunta
+   * objetiva), mesmo que `resposta` tenha ficado nula por não ter sido
+   * possível montá-la com segurança -- usado para mostrar um aviso em vez
+   * de simplesmente não mostrar nada. */
+  resposta_pretendida: boolean;
+  /** Todos os SQLs executados, juntos e legíveis (mesmo campo de auditoria
+   * já existente, logs_auditoria.sql_gerado). */
+  sql_gerado: string;
+  /** Uma entrada por consulta do plano, na ordem em que foram executadas. */
+  consultas: ConsultaExecutada[];
+  colunas: string[];
+  linhas: unknown[][];
+  total_linhas: number;
+  /** Espelha `consultas[principal].truncado` para a tabela exibida. */
+  fontes_truncadas: boolean;
 }
 
 // -- Usuários / Aprovação de Cadastros (app/api/routes_usuarios.py) -------
