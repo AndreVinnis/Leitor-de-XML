@@ -1,7 +1,8 @@
 """
 Cobre a política de retry/backoff das chamadas ao SDK do Gemini
-(app/ai/gemini_retry.py) e sua aplicação nos três call sites
-(normalizador_produtos, embeddings, consulta_nl_sql).
+(app/ai/gemini_retry.py) e seu único call site restante, embeddings.py --
+normalizador_produtos e consulta_nl_sql migraram para Claude (Anthropic), ver
+tests/test_anthropic_retry.py.
 
 Os testes de integração zeram `wait` via `<funcao>.retry.wait` (atributo
 mutável que o decorator @tenacity.retry expõe) para não deixar a suíte lenta
@@ -52,58 +53,6 @@ def _sem_espera(monkeypatch, funcao_decorada):
     """Zera o backoff de uma função decorada com @retry_gemini para o teste
     não esperar de verdade entre tentativas."""
     monkeypatch.setattr(funcao_decorada.retry, "wait", tenacity.wait_none())
-
-
-class TestNormalizadorProdutos:
-    def test_retenta_erro_transitorio_e_devolve_resultado(self, monkeypatch):
-        from app.ai import normalizador_produtos
-
-        _sem_espera(monkeypatch, normalizador_produtos._gerar_conteudo)
-        client = MagicMock()
-        client.models.generate_content.side_effect = [_server_error(503), "ok"]
-
-        resultado = normalizador_produtos._gerar_conteudo(client, model="m", contents="c")
-
-        assert resultado == "ok"
-        assert client.models.generate_content.call_count == 2
-
-    def test_esgota_tentativas_e_relanca(self, monkeypatch):
-        from app.ai import normalizador_produtos
-
-        _sem_espera(monkeypatch, normalizador_produtos._gerar_conteudo)
-        client = MagicMock()
-        client.models.generate_content.side_effect = _server_error(503)
-
-        with pytest.raises(genai_errors.ServerError):
-            normalizador_produtos._gerar_conteudo(client, model="m", contents="c")
-
-        assert client.models.generate_content.call_count == 3
-
-    def test_erro_de_cliente_permanente_nao_retenta(self, monkeypatch):
-        from app.ai import normalizador_produtos
-
-        _sem_espera(monkeypatch, normalizador_produtos._gerar_conteudo)
-        client = MagicMock()
-        client.models.generate_content.side_effect = _client_error(400)
-
-        with pytest.raises(genai_errors.ClientError):
-            normalizador_produtos._gerar_conteudo(client, model="m", contents="c")
-
-        assert client.models.generate_content.call_count == 1
-
-
-class TestConsultaNlSql:
-    def test_retenta_erro_transitorio_e_devolve_resultado(self, monkeypatch):
-        from app.ai import consulta_nl_sql
-
-        _sem_espera(monkeypatch, consulta_nl_sql._gerar_conteudo)
-        client = MagicMock()
-        client.models.generate_content.side_effect = [_client_error(429), "ok"]
-
-        resultado = consulta_nl_sql._gerar_conteudo(client, model="m", contents="c")
-
-        assert resultado == "ok"
-        assert client.models.generate_content.call_count == 2
 
 
 class TestEmbeddings:

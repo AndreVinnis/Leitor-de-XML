@@ -7,8 +7,15 @@ class Settings(BaseSettings):
     celery_broker_url: str = "redis://redis:6379/0"
     celery_result_backend: str = "redis://redis:6379/1"
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.5-flash"
-    gemini_embedding_model: str = "gemini-embedding-001"
+    # gemini-embedding-001 tem shutdown anunciado para 14/05/2028;
+    # gemini-embedding-2 é a substituição recomendada pela Google (GA desde
+    # 22/04/2026, sem shutdown anunciado). Trocar o modelo aqui exige rodar
+    # `python -m app.scripts.backfill_embeddings` de novo em cada ambiente
+    # (produtos canônicos com embedding_modelo antigo ficam de fora do
+    # pré-filtro de similaridade até lá -- ver app/ai/embeddings.py).
+    gemini_embedding_model: str = "gemini-embedding-2"
+    anthropic_api_key: str = ""
+    anthropic_model: str = "claude-sonnet-5"
     secret_key: str = "change-me"
 
     api_base_url: str = "http://localhost:8000"

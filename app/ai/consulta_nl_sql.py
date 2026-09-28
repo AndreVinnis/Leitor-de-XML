@@ -17,29 +17,64 @@ etc.) antes de aceitar o valor.
 from dataclasses import dataclass
 from typing import Literal, Optional
 
-from google import genai
-from google.genai import types
+import anthropic
 from pydantic import BaseModel
 
-from app.ai.gemini_retry import retry_gemini
+from app.ai.anthropic_retry import retry_anthropic
 from app.core.config import settings
 
-_client: Optional[genai.Client] = None
+_client: Optional[anthropic.Anthropic] = None
 
 FINALIDADES_VALIDAS = {"resposta", "fontes", "listagem"}
 MAX_CONSULTAS = 3
 
+# Saída bem menor que a normalização: no máximo MAX_CONSULTAS=3 SQLs (SQL
+# neste domínio raramente passa de ~300 tokens) + um resposta_modelo curto.
+# 2048 dá margem folgada mesmo para consultas com vários JOINs.
+_MAX_TOKENS = 2048
 
-def _get_client() -> genai.Client:
+_NOME_TOOL_PLANO = "registrar_plano_consulta"
+
+_TOOL_PLANO = {
+    "name": _NOME_TOOL_PLANO,
+    "description": (
+        "Registra o plano de consultas SQL somente leitura (até 3) e, "
+        "quando aplicável, o modelo de frase-resposta com marcadores."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "consultas": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "finalidade": {
+                            "type": "string",
+                            "enum": ["resposta", "fontes", "listagem"],
+                        },
+                        "sql": {"type": "string"},
+                    },
+                    "required": ["finalidade", "sql"],
+                },
+            },
+            "resposta_modelo": {"type": ["string", "null"]},
+        },
+        "required": ["consultas"],
+    },
+}
+
+
+def _get_client() -> anthropic.Anthropic:
     global _client
     if _client is None:
-        _client = genai.Client(api_key=settings.gemini_api_key)
+        _client = anthropic.Anthropic(api_key=settings.anthropic_api_key, max_retries=0)
     return _client
 
 
-@retry_gemini
-def _gerar_conteudo(client: genai.Client, **kwargs) -> types.GenerateContentResponse:
-    return client.models.generate_content(**kwargs)
+@retry_anthropic
+def _gerar_conteudo(client: anthropic.Anthropic, **kwargs) -> anthropic.types.Message:
+    return client.messages.create(**kwargs)
 
 
 class _ConsultaPlanejada(BaseModel):
@@ -179,18 +214,23 @@ def gerar_plano_consulta(pergunta: str, canonicos_existentes: list[dict]) -> Pla
 
     response = _gerar_conteudo(
         client,
-        model=settings.gemini_model,
-        contents=user_message,
-        config=types.GenerateContentConfig(
-            system_instruction=_SYSTEM_PROMPT,
-            response_mime_type="application/json",
-            response_schema=_PlanoConsultaResposta,
-        ),
+        model=settings.anthropic_model,
+        max_tokens=_MAX_TOKENS,
+        system=_SYSTEM_PROMPT,
+        thinking={"type": "disabled"},
+        tools=[_TOOL_PLANO],
+        tool_choice={"type": "tool", "name": _NOME_TOOL_PLANO},
+        messages=[{"role": "user", "content": user_message}],
     )
 
-    resposta = response.parsed
-    if resposta is None:
-        resposta = _PlanoConsultaResposta.model_validate_json(response.text)
+    tool_use = next((bloco for bloco in response.content if bloco.type == "tool_use"), None)
+    if tool_use is None:
+        raise RuntimeError(
+            "Resposta da IA sem bloco tool_use esperado "
+            f"(stop_reason={response.stop_reason!r})"
+        )
+
+    resposta = _PlanoConsultaResposta.model_validate(tool_use.input)
 
     return PlanoConsulta(
         consultas=[
