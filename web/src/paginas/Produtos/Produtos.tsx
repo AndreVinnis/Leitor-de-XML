@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -10,6 +10,7 @@ import {
   editarCanonico,
   listarCanonicos,
   listarSugestoes,
+  normalizacaoEmAndamento,
   rejeitarSugestao,
   rejeitarSugestoesLote,
   statusNormalizacao,
@@ -52,6 +53,14 @@ const STATUS_PARA_ROTULO: Record<StatusRevisao, string> = {
 const LIMITE_SUGESTOES = 20;
 const LIMITE_CANONICOS = 10;
 
+// Estados do Celery em que a task não muda mais.
+const ESTADOS_FINAIS = new Set(["SUCCESS", "FAILURE", "REVOKED"]);
+
+// Consultas seguidas com a trava fora desta task (e status não final) até
+// considerar a task morta. Uma só não basta: ao terminar, a task solta a
+// trava um instante antes de o Celery gravar o resultado.
+const CONSULTAS_ATE_TASK_PERDIDA = 3;
+
 export function Produtos() {
   const [aba, setAba] = useState<Aba>("sugestoes");
   const { casoId } = useParams<{ casoId: string }>();
@@ -60,38 +69,99 @@ export function Produtos() {
   const { notificar } = useToast();
   const [taskId, setTaskId] = useState<string | null>(null);
 
+  // Tasks já encerradas nesta tela -- nunca readotadas (nem pelo
+  // em-andamento, nem pelo 409), para não repetir o toast de conclusão.
+  const tasksEncerradas = useRef(new Set<string>());
+  const consultasSemTrava = useRef(0);
+
+  const acompanhar = useCallback((id: string) => {
+    if (tasksEncerradas.current.has(id)) return false;
+    consultasSemTrava.current = 0;
+    setTaskId(id);
+    return true;
+  }, []);
+
+  // Retoma o acompanhamento de uma normalização já em andamento no caso
+  // (página recarregada no meio, ou disparada em outra aba) -- sem isso o
+  // botão voltaria a ficar habilitado com a task ainda rodando.
+  const emAndamento = useQuery({
+    queryKey: ["normalizacao-em-andamento", casoIdNumero],
+    queryFn: () => normalizacaoEmAndamento(casoIdNumero),
+    refetchOnWindowFocus: false,
+  });
+
+  useEffect(() => {
+    const taskEmAndamento = emAndamento.data?.task_id;
+    if (taskEmAndamento) acompanhar(taskEmAndamento);
+  }, [emAndamento.data, acompanhar]);
+
   const normalizar = useMutation({
     mutationFn: () => dispararNormalizacao(casoIdNumero),
     onSuccess: (resposta) => {
-      setTaskId(resposta.task_id);
+      acompanhar(resposta.task_id);
       notificar("Normalização disparada em segundo plano.");
     },
-    onError: (erro) => {
+    onError: async (erro) => {
+      // 409: já existe normalização em andamento no caso (trava por caso no
+      // backend) -- em vez de só mostrar o erro, passa a acompanhar aquela.
+      if (erro instanceof ErroApi && erro.status === 409) {
+        try {
+          const { task_id: taskEmAndamento } = await normalizacaoEmAndamento(casoIdNumero);
+          if (taskEmAndamento && acompanhar(taskEmAndamento)) {
+            notificar("Já existe uma normalização em andamento para este caso. Acompanhando o progresso.");
+            return;
+          }
+        } catch {
+          /* cai na mensagem de erro abaixo */
+        }
+      }
       notificar(erro instanceof ErroApi ? erro.message : "Erro ao disparar normalização.", "erro");
     },
   });
 
   const statusTask = useQuery({
     queryKey: ["normalizacao-status", taskId],
-    queryFn: () => statusNormalizacao(taskId as string),
+    queryFn: () => statusNormalizacao(taskId as string, casoIdNumero),
     enabled: taskId !== null,
     // Reconsulta sozinho enquanto a task não terminar (mesmo padrão do
     // progresso de upload em UploadXml.tsx).
     refetchInterval: (query) => {
       const dados = query.state.data;
-      if (!dados || (dados.status !== "SUCCESS" && dados.status !== "FAILURE")) return 1500;
+      if (!dados || !ESTADOS_FINAIS.has(dados.status)) return 1500;
       return false;
     },
   });
 
+  // dataUpdatedAt nas dependências: consultas seguidas com a mesma resposta
+  // mantêm a mesma referência de `data` (structural sharing), e a contagem
+  // de consultas sem trava precisa avançar mesmo assim.
   useEffect(() => {
     const dados = statusTask.data;
-    if (!dados || (dados.status !== "SUCCESS" && dados.status !== "FAILURE")) return;
+    if (!dados || taskId === null || dados.task_id !== taskId) return;
 
-    if (dados.status === "FAILURE" || dados.resultado?.status === "erro_inesperado") {
-      notificar(`Falha na normalização: ${dados.resultado?.motivo ?? "motivo desconhecido"}`, "erro");
+    const resultado = dados.resultado;
+    if (!ESTADOS_FINAIS.has(dados.status)) {
+      consultasSemTrava.current = dados.ativa === false ? consultasSemTrava.current + 1 : 0;
+      if (consultasSemTrava.current < CONSULTAS_ATE_TASK_PERDIDA) return;
+      notificar(
+        "A normalização parou sem concluir (o processamento foi interrompido no servidor). " +
+          'Os lotes já processados foram salvos; clique em "Normalizar produtos pendentes" para continuar.',
+        "erro"
+      );
+    } else if (resultado?.status === "falha_lote") {
+      const salvos = resultado.lotes_salvos ?? 0;
+      notificar(
+        `Normalização interrompida no lote ${resultado.lote_com_falha} de ${resultado.total_lotes}: ` +
+          `${resultado.motivo ?? "motivo desconhecido"}. ` +
+          (salvos > 0
+            ? `${salvos} lote(s) já foram salvos; clique em "Normalizar produtos pendentes" para continuar de onde parou.`
+            : 'Nenhum lote foi salvo; clique em "Normalizar produtos pendentes" para tentar de novo.'),
+        "erro"
+      );
+    } else if (dados.status !== "SUCCESS" || resultado?.status === "erro_inesperado" || resultado?.status === "ja_em_andamento") {
+      notificar(`Falha na normalização: ${resultado?.motivo ?? "motivo desconhecido"}`, "erro");
     } else {
-      const sugestoesCriadas = dados.resultado?.sugestoes_criadas ?? 0;
+      const sugestoesCriadas = resultado?.sugestoes_criadas ?? 0;
       notificar(
         sugestoesCriadas > 0
           ? `Normalização concluída: ${sugestoesCriadas} sugestão(ões) criada(s) para revisão.`
@@ -99,13 +169,24 @@ export function Produtos() {
       );
     }
 
+    // Invalida também nas falhas: os lotes anteriores já foram salvos.
     queryClient.invalidateQueries({ queryKey: ["sugestoes", casoIdNumero] });
     queryClient.invalidateQueries({ queryKey: ["canonicos-todos", casoIdNumero] });
     queryClient.invalidateQueries({ queryKey: ["canonicos-tabela", casoIdNumero] });
+    // Sem isso, voltar a esta tela serviria do cache o task_id já terminado
+    // e o toast de conclusão apareceria de novo.
+    queryClient.removeQueries({ queryKey: ["normalizacao-em-andamento", casoIdNumero] });
+    tasksEncerradas.current.add(taskId);
     setTaskId(null);
-  }, [statusTask.data, queryClient, casoIdNumero, notificar]);
+  }, [statusTask.data, statusTask.dataUpdatedAt, taskId, queryClient, casoIdNumero, notificar]);
 
-  const normalizando = normalizar.isPending || (taskId !== null && statusTask.data?.status !== "SUCCESS" && statusTask.data?.status !== "FAILURE");
+  const normalizando =
+    normalizar.isPending || (taskId !== null && !(statusTask.data && ESTADOS_FINAIS.has(statusTask.data.status)));
+  const progresso = statusTask.data?.progresso;
+  const rotuloNormalizando =
+    progresso && progresso.total_lotes > 0
+      ? `Normalizando lote ${Math.min(progresso.lotes_salvos + 1, progresso.total_lotes)} de ${progresso.total_lotes}...`
+      : "Normalizando...";
 
   return (
     <div className={estilos.pagina}>
@@ -117,7 +198,7 @@ export function Produtos() {
           </p>
         </div>
         <Botao onClick={() => normalizar.mutate()} disabled={normalizando}>
-          {normalizando ? "Normalizando..." : "Normalizar produtos pendentes"}
+          {normalizando ? rotuloNormalizando : "Normalizar produtos pendentes"}
         </Botao>
       </div>
 

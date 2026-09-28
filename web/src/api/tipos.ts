@@ -181,22 +181,41 @@ export interface DisparoNormalizacao {
   task_id: string;
 }
 
-// app/workers/tasks.py::normalizar_produtos_pendentes -- "erro_inesperado"
-// só acontece se uma exceção escapar da task (bug), não é um caminho normal.
+export interface NormalizacaoEmAndamento {
+  task_id: string | null;
+}
+
+// app/workers/tasks.py::normalizar_produtos_pendentes. "falha_lote": um lote
+// esgotou as 3 tentativas e a task parou (os lotes anteriores ficaram salvos;
+// um novo disparo continua de onde parou). "ja_em_andamento": outra execução
+// já tinha a trava do caso. "erro_inesperado" só acontece se uma exceção
+// escapar do loop de lotes (bug), não é um caminho normal.
 export interface ResultadoNormalizacao {
-  status: "ok" | "erro_inesperado";
+  status: "ok" | "falha_lote" | "ja_em_andamento" | "erro_inesperado";
   descricoes_unicas?: number;
   itens_pendentes?: number;
+  total_lotes?: number;
+  lote_com_falha?: number;
+  lotes_salvos?: number;
   produtos_canonicos_criados?: number;
   sugestoes_criadas?: number;
   motivo?: string;
 }
 
-// result.status de um AsyncResult do Celery (PENDING/STARTED/SUCCESS/FAILURE/...) --
-// resultado só vem preenchido quando a task termina (result.ready()).
+// Publicado pela task a cada lote salvo (estado PROGRESS do Celery).
+export interface ProgressoNormalizacao {
+  lotes_salvos: number;
+  total_lotes: number;
+  sugestoes_criadas: number;
+}
+
 export interface StatusNormalizacao {
   task_id: string;
   status: string;
+  // Se a trava do caso ainda pertence a esta task (null sem cliente_caso_id).
+  // false com status não final = task morta (worker reiniciado no meio).
+  ativa: boolean | null;
+  progresso: ProgressoNormalizacao | null;
   resultado: ResultadoNormalizacao | null;
 }
 

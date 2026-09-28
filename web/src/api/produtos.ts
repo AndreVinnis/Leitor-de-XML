@@ -4,6 +4,7 @@ import type {
   ListaCanonicos,
   ListaItensVinculados,
   ListaSugestoes,
+  NormalizacaoEmAndamento,
   ProdutoCanonico,
   ResultadoRevisao,
   ResultadoRevisaoLote,
@@ -17,8 +18,12 @@ export function dispararNormalizacao(clienteCasoId: number): Promise<DisparoNorm
   return postJson<DisparoNormalizacao>("/api/produtos/normalizar", { cliente_caso_id: clienteCasoId });
 }
 
-export function statusNormalizacao(taskId: string): Promise<StatusNormalizacao> {
-  return get<StatusNormalizacao>(`/api/produtos/normalizar/${taskId}/status`);
+export function normalizacaoEmAndamento(clienteCasoId: number): Promise<NormalizacaoEmAndamento> {
+  return get<NormalizacaoEmAndamento>(`/api/produtos/normalizar/em-andamento?cliente_caso_id=${clienteCasoId}`);
+}
+
+export function statusNormalizacao(taskId: string, clienteCasoId: number): Promise<StatusNormalizacao> {
+  return get<StatusNormalizacao>(`/api/produtos/normalizar/${taskId}/status?cliente_caso_id=${clienteCasoId}`);
 }
 
 interface ParametrosListarSugestoes {

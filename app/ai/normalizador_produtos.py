@@ -11,9 +11,8 @@ A IA nunca escreve direto no banco: só sugere, revisão humana decide.
 from typing import Optional
 
 import anthropic
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from app.ai.anthropic_retry import retry_anthropic
 from app.core.config import settings
 
 _client: Optional[anthropic.Anthropic] = None
@@ -24,6 +23,12 @@ _client: Optional[anthropic.Anthropic] = None
 # ficam bem abaixo disso; o valor dá margem de segurança sem chegar perto do
 # teto de saída do modelo. Revisar junto se TAMANHO_LOTE_IA mudar.
 _MAX_TOKENS = 8000
+
+# Teto de uma chamada. O default do SDK para max_tokens=8000 é 600s; com
+# até 3 tentativas por lote (app/workers/tasks.py), isso deixaria um lote
+# preso por meia hora e estouraria o TTL da trava por caso
+# (app/core/trava_normalizacao.py, renovada antes de cada tentativa).
+_TIMEOUT_SEGUNDOS = 300.0
 
 _NOME_TOOL_SUGESTOES = "registrar_sugestoes_normalizacao"
 
@@ -42,7 +47,7 @@ _TOOL_SUGESTOES = {
                     "type": "object",
                     "properties": {
                         "descricao_original": {"type": "string"},
-                        "confianca": {"type": "number"},
+                        "confianca": {"type": "number", "minimum": 0, "maximum": 1},
                         "produto_canonico_id": {"type": ["integer", "null"]},
                         "novo_produto_canonico": {
                             "anyOf": [
@@ -71,14 +76,16 @@ def _get_client() -> anthropic.Anthropic:
     global _client
     if _client is None:
         # max_retries=0: o SDK da Anthropic já retenta 429/5xx/erro de rede
-        # por padrão (max_retries=2) -- zerar aqui evita duas camadas de
-        # retry sobrepostas (a do SDK + a do tenacity via retry_anthropic),
-        # que multiplicariam tentativas/backoffs de forma imprevisível.
-        _client = anthropic.Anthropic(api_key=settings.anthropic_api_key, max_retries=0)
+        # por padrão (max_retries=2). Aqui a única camada de retry é a do
+        # lote em app/workers/tasks.py (TENTATIVAS_POR_LOTE), que já refaz a
+        # chamada inteira -- qualquer retry a mais multiplicaria as
+        # tentativas e quebraria a regra de parar após 3 falhas seguidas.
+        _client = anthropic.Anthropic(
+            api_key=settings.anthropic_api_key, max_retries=0, timeout=_TIMEOUT_SEGUNDOS
+        )
     return _client
 
 
-@retry_anthropic
 def _gerar_conteudo(client: anthropic.Anthropic, **kwargs) -> anthropic.types.Message:
     return client.messages.create(**kwargs)
 
@@ -90,7 +97,9 @@ class NovoProdutoCanonicoIA(BaseModel):
 
 class SugestaoIA(BaseModel):
     descricao_original: str
-    confianca: float
+    # 0 a 1: fora disso estouraria Numeric(5,4) só no INSERT -- validar aqui
+    # faz o erro aparecer antes de qualquer escrita no banco.
+    confianca: float = Field(ge=0, le=1)
     produto_canonico_id: Optional[int] = None
     novo_produto_canonico: Optional[NovoProdutoCanonicoIA] = None
 

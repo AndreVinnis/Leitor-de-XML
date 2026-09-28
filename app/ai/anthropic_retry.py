@@ -6,8 +6,9 @@ permanentes propagam na primeira tentativa; `reraise=True` preserva o
 comportamento de propagação de erro que já existia em cada call site), mas
 usando as exceções do SDK `anthropic` em vez do `google-genai`. Módulo
 separado porque app/ai/embeddings.py continua no Gemini -- gemini_retry.py
-permanece dedicado só a ele, este aqui é usado por normalizador_produtos.py e
-consulta_nl_sql.py.
+permanece dedicado só a ele, este aqui é usado por consulta_nl_sql.py.
+normalizador_produtos.py não usa: o retry dele é o do lote, em
+app/workers/tasks.py (TENTATIVAS_POR_LOTE).
 
 Todo `anthropic.APIStatusError` já expõe `.status_code` (RateLimitError=429,
 InternalServerError/ServiceUnavailableError/OverloadedError/

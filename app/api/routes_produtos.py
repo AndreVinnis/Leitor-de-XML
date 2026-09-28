@@ -1,10 +1,12 @@
 from datetime import date, datetime
+from uuid import uuid4
 
 from fastapi import APIRouter, Body, Depends, HTTPException
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.ai.embeddings import gerar_embeddings, serializar_embedding
+from app.core import trava_normalizacao
 from app.core.auth import usuario_atual_ativo
 from app.core.config import settings
 from app.core.database import SessionLocal
@@ -33,17 +35,82 @@ async def disparar_normalizacao(
     """
     Dispara, de forma assíncrona, a normalização por IA de todos os itens
     pendentes (sem produto_canonico e sem sugestão já criada) de um caso.
+
+    Uma execução por caso de cada vez (app/core/trava_normalizacao.py): a
+    trava é adquirida aqui, com o task_id já definido, antes de enfileirar
+    -- assim um segundo disparo recebe 409 imediatamente, em vez de entrar
+    na fila e só descobrir a trava no worker. O task_id em andamento sai em
+    GET /normalizar/em-andamento.
     """
-    task = normalizar_produtos_pendentes.delay(cliente_caso_id)
-    return {"status": "processando", "task_id": task.id}
+    task_id = str(uuid4())
+    if not trava_normalizacao.adquirir(cliente_caso_id, task_id):
+        raise HTTPException(
+            status_code=409,
+            detail="Já existe uma normalização em andamento para este caso.",
+        )
+    try:
+        normalizar_produtos_pendentes.apply_async(args=[cliente_caso_id], task_id=task_id)
+    except Exception:
+        trava_normalizacao.liberar(cliente_caso_id, task_id)
+        raise
+    return {"status": "processando", "task_id": task_id}
+
+
+@router.get("/normalizar/em-andamento")
+async def normalizacao_em_andamento(
+    cliente_caso_id: int, usuario: Usuario = Depends(usuario_atual_ativo)
+):
+    """task_id da normalização em andamento para o caso, ou null -- usado
+    pela tela para retomar o acompanhamento depois de recarregar a página.
+
+    Se a trava ficou presa com uma task que já terminou (a liberação no
+    finally da task falhou), solta aqui e responde null -- senão a tela
+    readotaria uma task finalizada até o TTL expirar."""
+    from celery import states
+
+    from app.workers.celery_app import celery_app
+
+    task_id = trava_normalizacao.task_em_andamento(cliente_caso_id)
+    if task_id is not None:
+        estado = celery_app.backend.get_task_meta(task_id)["status"]
+        if estado in states.READY_STATES:
+            trava_normalizacao.liberar(cliente_caso_id, task_id)
+            task_id = None
+    return {"task_id": task_id}
 
 
 @router.get("/normalizar/{task_id}/status")
-async def status_normalizacao(task_id: str, usuario: Usuario = Depends(usuario_atual_ativo)):
+async def status_normalizacao(
+    task_id: str,
+    cliente_caso_id: int | None = None,
+    usuario: Usuario = Depends(usuario_atual_ativo),
+):
+    """
+    Estado da task no Celery. PROGRESS é publicado pela task a cada lote
+    salvo (lotes_salvos, total_lotes, sugestoes_criadas).
+
+    Com `cliente_caso_id`, informa também `ativa`: se a trava do caso ainda
+    pertence a esta task. Uma task morta (worker reiniciado no meio) fica
+    em PROGRESS/PENDING para sempre no backend, mas perde a trava -- é por
+    aqui que a tela descobre que deve parar de acompanhar.
+    """
+    from celery import states
+
     from app.workers.celery_app import celery_app
 
-    result = celery_app.AsyncResult(task_id)
-    return {"task_id": task_id, "status": result.status, "resultado": result.result if result.ready() else None}
+    # Uma leitura só do backend: status e resultado do mesmo instante.
+    meta = celery_app.backend.get_task_meta(task_id)
+    estado = meta["status"]
+    ativa = None
+    if cliente_caso_id is not None:
+        ativa = trava_normalizacao.task_em_andamento(cliente_caso_id) == task_id
+    return {
+        "task_id": task_id,
+        "status": estado,
+        "ativa": ativa,
+        "progresso": meta["result"] if estado == "PROGRESS" else None,
+        "resultado": meta["result"] if estado in states.READY_STATES else None,
+    }
 
 
 @router.get("/canonicos")
