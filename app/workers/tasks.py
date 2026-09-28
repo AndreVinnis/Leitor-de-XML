@@ -1,3 +1,6 @@
+import time
+
+from celery.utils.log import get_task_logger
 from sqlalchemy.exc import IntegrityError
 
 from app.ai.embeddings import gerar_embeddings, selecionar_candidatos_similares, serializar_embedding
@@ -5,6 +8,7 @@ from app.ai.normalizador_produtos import sugerir_normalizacao
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.email import enviar_email
+from app.core import trava_normalizacao
 from app.core.tokens import gerar_token_aprovacao
 from app.models.models import (
     ArquivoLote,
@@ -37,7 +41,20 @@ CSTAT_EVENTO_REGISTRADO = {"135", "136", "155"}
 # pode alterar uma nota real, mesmo que a chave de acesso combine.
 TP_AMB_PRODUCAO = "1"
 
+logger = get_task_logger(__name__)
+
 TAMANHO_LOTE_IA = 50
+
+# Cada lote da normalização é enviado, salvo (commit) e só então o próximo
+# segue. Um lote que falha é tentado de novo até TENTATIVAS_POR_LOTE vezes
+# no total, com as esperas abaixo entre uma tentativa e outra; na última
+# falha a task para e devolve o erro, mantendo os lotes anteriores já
+# salvos. É a única camada de retry das chamadas ao Claude -- o normalizador
+# não usa retry_anthropic, senão cada tentativa daqui viraria até 3 chamadas.
+# (gerar_embeddings mantém o retry_gemini próprio, para erros transitórios
+# do Gemini dentro de uma mesma tentativa.)
+TENTATIVAS_POR_LOTE = 3
+ESPERAS_ENTRE_TENTATIVAS = (10, 30)
 
 # Pré-filtro por embeddings: catálogos até esse tamanho continuam indo
 # inteiros no prompt (comportamento e precisão de hoje, sem custo extra de
@@ -506,8 +523,263 @@ def _normalizar_chave(descricao: str) -> str:
     return descricao.strip().upper()
 
 
-@celery_app.task(name="normalizar_produtos_pendentes")
-def normalizar_produtos_pendentes(cliente_caso_id: int) -> dict:
+class _CatalogoEmMemoria:
+    """
+    Catálogo de canônicos do caso usado como contexto da IA durante uma
+    execução de normalizar_produtos_pendentes. Só recebe um canônico novo
+    via `registrar`, chamado depois do commit do lote que o criou -- um
+    lote que falha e sofre rollback não pode deixar aqui um id que não
+    existe mais no banco (a tentativa seguinte o ofereceria à IA como
+    candidato válido).
+    """
+
+    def __init__(self, canonicos_orm: list[ProdutoCanonico]):
+        self.existentes = [
+            {"id": c.id, "nome_canonico": c.nome_canonico, "categoria": c.categoria}
+            for c in canonicos_orm
+        ]
+        self.por_id = {c["id"]: c for c in self.existentes}
+        # Por nome normalizado (mesma chave de _normalizar_chave) -- usado
+        # para não tentar inserir um produto_canonico com nome que já existe
+        # (uq_produto_canonico_caso_nome). A IA não coordena "produto novo"
+        # entre descrições de um mesmo lote nem enxerga um canônico fora do
+        # pré-filtro de embedding, então pode sugerir o mesmo nome como novo
+        # mais de uma vez dentro desta mesma execução.
+        self.por_nome = {_normalizar_chave(c["nome_canonico"]): c["id"] for c in self.existentes}
+        # Só entram no pré-filtro canônicos com embedding do modelo
+        # atualmente configurado -- um embedding de modelo antigo é tratado
+        # como inexistente, nunca comparado por cosseno contra um vetor de
+        # espaço diferente (ver app/models/models.py::ProdutoCanonico.embedding_modelo).
+        self.embeddings = {
+            c.id: c.embedding
+            for c in canonicos_orm
+            if c.embedding and c.embedding_modelo == settings.gemini_embedding_model
+        }
+
+    def registrar(self, canonico: dict, chave_nome: str, embedding: bytes | None) -> None:
+        # Sem isso, o canônico criado (ou reaproveitado de uma colisão) em um
+        # lote não apareceria como candidato real (nem na lista cheia, nem no
+        # pré-filtro de embedding, nem na dedução por nome) nos lotes
+        # seguintes desta mesma execução.
+        if canonico["id"] not in self.por_id:
+            self.existentes.append(canonico)
+            self.por_id[canonico["id"]] = canonico
+        self.por_nome[chave_nome] = canonico["id"]
+        if embedding is not None:
+            self.embeddings[canonico["id"]] = embedding
+
+
+def _processar_lote_normalizacao(
+    db,
+    cliente_caso_id: int,
+    lote_chaves: list[str],
+    descricao_original_por_chave: dict[str, str],
+    itens_por_chave: dict[str, list[int]],
+    catalogo: _CatalogoEmMemoria,
+    usar_filtro_embedding: bool,
+    embeddings_descricoes: dict[str, list[float]],
+) -> dict:
+    """
+    Pede à IA as sugestões de um lote e adiciona na sessão os canônicos
+    novos e as SugestaoNormalizacao. Não faz commit nem altera `catalogo`:
+    quem chama commita e, só então, registra os canônicos devolvidos em
+    "canonicos_novos".
+    """
+    # Relê, a cada tentativa, quais itens do lote já ganharam sugestão: um
+    # commit ambíguo (conexão perdida depois de o MySQL efetivar o COMMIT)
+    # faria a tentativa seguinte inserir as mesmas sugestões de novo.
+    ids_do_lote = [item_id for chave in lote_chaves for item_id in itens_por_chave[chave]]
+    ja_sugeridos = {
+        item_id
+        for (item_id,) in db.query(SugestaoNormalizacao.item_nota_id).filter(
+            SugestaoNormalizacao.item_nota_id.in_(ids_do_lote)
+        )
+    }
+    itens_por_chave = {
+        chave: [i for i in itens_por_chave[chave] if i not in ja_sugeridos] for chave in lote_chaves
+    }
+    lote_chaves = [chave for chave in lote_chaves if itens_por_chave[chave]]
+    if not lote_chaves:
+        return {"sugestoes_criadas": 0, "produtos_canonicos_criados": 0, "canonicos_novos": []}
+
+    descricoes_lote = [descricao_original_por_chave[c] for c in lote_chaves]
+
+    if usar_filtro_embedding:
+        ids_candidatos = selecionar_candidatos_similares(
+            lote_chaves,
+            embeddings_descricoes,
+            catalogo.embeddings,
+            top_k=TOP_K_CANDIDATOS,
+            max_total=MAX_CANDIDATOS_POR_LOTE,
+        )
+        candidatos_lote = [catalogo.por_id[cid] for cid in ids_candidatos]
+    else:
+        candidatos_lote = catalogo.existentes
+
+    resultados = sugerir_normalizacao(descricoes_lote, candidatos_lote)
+    resultados_por_chave = {_normalizar_chave(r.descricao_original): r for r in resultados}
+
+    # Canônicos novos deste lote, por nome normalizado -- deduplica dentro
+    # do lote sem tocar em `catalogo` antes do commit.
+    novos_no_lote: dict[str, tuple[dict, bytes | None]] = {}
+    sugestoes_criadas = 0
+    produtos_canonicos_criados = 0
+
+    for chave in lote_chaves:
+        resultado = resultados_por_chave.get(chave)
+        if resultado is None:
+            continue  # IA não retornou sugestão para essa descrição
+
+        produto_canonico_id = resultado.produto_canonico_id
+        if produto_canonico_id is not None and produto_canonico_id not in catalogo.por_id:
+            produto_canonico_id = None  # segurança: IA apontou id inexistente
+
+        if produto_canonico_id is None:
+            if resultado.novo_produto_canonico is None:
+                continue  # sem correspondência e sem produto novo -- ignora
+
+            chave_nome = _normalizar_chave(resultado.novo_produto_canonico.nome_canonico)
+            produto_canonico_id = catalogo.por_nome.get(chave_nome)
+            if produto_canonico_id is None and chave_nome in novos_no_lote:
+                produto_canonico_id = novos_no_lote[chave_nome][0]["id"]
+
+            if produto_canonico_id is None:
+                novo = ProdutoCanonico(
+                    cliente_caso_id=cliente_caso_id,
+                    nome_canonico=resultado.novo_produto_canonico.nome_canonico,
+                    categoria=resultado.novo_produto_canonico.categoria,
+                )
+                novo.embedding = serializar_embedding(gerar_embeddings([novo.nome_canonico])[0])
+                novo.embedding_modelo = settings.gemini_embedding_model
+                try:
+                    with db.begin_nested():
+                        db.add(novo)
+                        db.flush()  # garante novo.id
+                except IntegrityError:
+                    # uq_produto_canonico_caso_nome: outra execução
+                    # concorrente desta task para o mesmo cliente_caso_id
+                    # criou esse nome entre a consulta do catálogo e este
+                    # flush. Reusa o canônico existente em vez de abortar
+                    # o lote inteiro (e com ele as sugestões já válidas).
+                    existente = (
+                        db.query(ProdutoCanonico)
+                        .filter(
+                            ProdutoCanonico.cliente_caso_id == cliente_caso_id,
+                            ProdutoCanonico.nome_canonico
+                            == resultado.novo_produto_canonico.nome_canonico,
+                        )
+                        .one()
+                    )
+                    embedding_existente = (
+                        existente.embedding
+                        if existente.embedding
+                        and existente.embedding_modelo == settings.gemini_embedding_model
+                        else None
+                    )
+                    novos_no_lote[chave_nome] = (
+                        {
+                            "id": existente.id,
+                            "nome_canonico": existente.nome_canonico,
+                            "categoria": existente.categoria,
+                        },
+                        embedding_existente,
+                    )
+                    produto_canonico_id = existente.id
+                else:
+                    novos_no_lote[chave_nome] = (
+                        {
+                            "id": novo.id,
+                            "nome_canonico": novo.nome_canonico,
+                            "categoria": novo.categoria,
+                        },
+                        novo.embedding,
+                    )
+                    produto_canonico_id = novo.id
+                    produtos_canonicos_criados += 1
+
+        for item_id in itens_por_chave[chave]:
+            db.add(
+                SugestaoNormalizacao(
+                    item_nota_id=item_id,
+                    produto_canonico_sugerido_id=produto_canonico_id,
+                    confianca=resultado.confianca,
+                    status=StatusRevisao.PENDENTE,
+                )
+            )
+            sugestoes_criadas += 1
+
+    return {
+        "sugestoes_criadas": sugestoes_criadas,
+        "produtos_canonicos_criados": produtos_canonicos_criados,
+        "canonicos_novos": [
+            (canonico, chave_nome, embedding)
+            for chave_nome, (canonico, embedding) in novos_no_lote.items()
+        ],
+    }
+
+
+class _TravaPerdida(Exception):
+    """A trava do caso expirou e pode já pertencer a outra execução."""
+
+
+def _executar_com_tentativas(db, etapa: str, funcao, verificar_trava=None):
+    """
+    Executa `funcao(tentativa)` e commita. Em erro, faz rollback e tenta de
+    novo, até TENTATIVAS_POR_LOTE vezes no total. Devolve (resultado, None)
+    no sucesso ou (None, ultimo_erro) quando todas as tentativas falharam.
+
+    `verificar_trava` roda antes de cada tentativa (renovando o TTL) e logo
+    antes do commit: se a trava foi perdida, desfaz e propaga _TravaPerdida
+    sem tentar de novo -- commitar ali arriscaria duplicar sugestões com a
+    execução que assumiu o caso.
+    """
+    ultimo_erro: Exception | None = None
+    for tentativa in range(1, TENTATIVAS_POR_LOTE + 1):
+        try:
+            if verificar_trava is not None:
+                verificar_trava()
+            resultado = funcao(tentativa)
+            if verificar_trava is not None:
+                verificar_trava()
+            db.commit()
+            return resultado, None
+        except _TravaPerdida:
+            db.rollback()
+            raise
+        except Exception as exc:  # noqa: BLE001 -- qualquer erro conta como tentativa falha
+            db.rollback()
+            ultimo_erro = exc
+            logger.warning(
+                "Normalização: %s falhou (tentativa %d de %d): %r",
+                etapa, tentativa, TENTATIVAS_POR_LOTE, exc,
+            )
+            if tentativa < TENTATIVAS_POR_LOTE:
+                indice_espera = min(tentativa - 1, len(ESPERAS_ENTRE_TENTATIVAS) - 1)
+                time.sleep(ESPERAS_ENTRE_TENTATIVAS[indice_espera])
+    return None, ultimo_erro
+
+
+def _motivo_falha(erro: Exception) -> str:
+    return (
+        f"{TENTATIVAS_POR_LOTE} tentativas falharam. Último erro: "
+        f"{str(erro) or type(erro).__name__}"
+    )
+
+
+def _assumir_trava(cliente_caso_id: int, task_id: str) -> bool:
+    """
+    A rota POST /api/produtos/normalizar já adquire a trava com o task_id
+    antes de enfileirar; aqui confirma e renova o TTL (o tempo na fila já
+    consumiu parte dele). Se a trava expirou na fila, ou a task foi
+    enfileirada por outro caminho, tenta adquirir de novo.
+    """
+    return trava_normalizacao.renovar(cliente_caso_id, task_id) or trava_normalizacao.adquirir(
+        cliente_caso_id, task_id
+    )
+
+
+@celery_app.task(bind=True, name="normalizar_produtos_pendentes")
+def normalizar_produtos_pendentes(self, cliente_caso_id: int) -> dict:
     """
     Busca itens de nota sem produto_canonico e sem sugestão pendente/já
     revisada, deduplica pela descrição original e pede à IA para sugerir
@@ -521,11 +793,46 @@ def normalizar_produtos_pendentes(cliente_caso_id: int) -> dict:
 
     Item de nota CANCELADA fica de fora: não vale gastar chamada de IA
     normalizando produto de uma nota que não conta mais para reconciliação.
+
+    Lote a lote: cada lote de TAMANHO_LOTE_IA descrições é enviado à IA e
+    commitado antes do próximo (ver TENTATIVAS_POR_LOTE). Se um lote esgota
+    as tentativas, a task para com status "falha_lote" e os lotes anteriores
+    ficam salvos -- um novo disparo continua de onde parou, porque os itens
+    já com sugestão saem da consulta de pendentes.
+
+    Protegida por trava por caso (app/core/trava_normalizacao.py). Chamada
+    direta, fora do Celery (self.request.id é None), roda sem trava.
     """
+    task_id = self.request.id
+    try:
+        # Dentro do try: se o Redis falhar aqui, o finally ainda libera a
+        # trava que a rota adquiriu com este task_id (liberar só apaga a
+        # trava se ela for deste task_id, então o caminho "ja_em_andamento"
+        # não mexe na de outra execução).
+        if task_id is not None and not _assumir_trava(cliente_caso_id, task_id):
+            return {
+                "status": "ja_em_andamento",
+                "motivo": "Já existe uma normalização em andamento para este caso.",
+            }
+        return _normalizar_produtos_pendentes(self, cliente_caso_id, task_id)
+    finally:
+        if task_id is not None:
+            try:
+                trava_normalizacao.liberar(cliente_caso_id, task_id)
+            except Exception as exc:  # noqa: BLE001
+                # Fail-open: sem Redis a trava não sai agora, mas expira
+                # sozinha pelo TTL -- não vale trocar o resultado da task
+                # (lotes já salvos) por um erro de infraestrutura.
+                logger.warning(
+                    "Normalização: falha ao liberar trava do caso %s: %r", cliente_caso_id, exc
+                )
+
+
+def _normalizar_produtos_pendentes(task, cliente_caso_id: int, task_id: str | None) -> dict:
     db = SessionLocal()
     try:
         itens_pendentes = (
-            db.query(ItemNota)
+            db.query(ItemNota.id, ItemNota.descricao_original)
             .join(Nota, Nota.id == ItemNota.nota_id)
             .outerjoin(SugestaoNormalizacao, SugestaoNormalizacao.item_nota_id == ItemNota.id)
             .filter(ItemNota.produto_canonico_id.is_(None))
@@ -538,173 +845,135 @@ def normalizar_produtos_pendentes(cliente_caso_id: int) -> dict:
             return {"status": "ok", "descricoes_unicas": 0, "sugestoes_criadas": 0}
 
         # Deduplica por descrição normalizada -- poucas descrições distintas,
-        # muitas notas repetindo a mesma descrição.
-        grupos: dict[str, list[ItemNota]] = {}
+        # muitas notas repetindo a mesma descrição. Guarda só ids (não
+        # objetos ORM): o rollback de um lote que falha expira a sessão.
+        itens_por_chave: dict[str, list[int]] = {}
         descricao_original_por_chave: dict[str, str] = {}
-        for item in itens_pendentes:
-            chave = _normalizar_chave(item.descricao_original)
-            grupos.setdefault(chave, []).append(item)
-            descricao_original_por_chave.setdefault(chave, item.descricao_original)
+        for item_id, descricao in itens_pendentes:
+            chave = _normalizar_chave(descricao)
+            itens_por_chave.setdefault(chave, []).append(item_id)
+            descricao_original_por_chave.setdefault(chave, descricao)
 
-        canonicos_orm = (
-            db.query(ProdutoCanonico)
-            .filter(ProdutoCanonico.cliente_caso_id == cliente_caso_id)
-            .all()
-        )
-        canonicos_existentes = [
-            {"id": c.id, "nome_canonico": c.nome_canonico, "categoria": c.categoria}
-            for c in canonicos_orm
-        ]
-        canonicos_por_id = {c["id"]: c for c in canonicos_existentes}
-        ids_canonicos_existentes = {c["id"] for c in canonicos_existentes}
-        # Por nome normalizado (mesma chave de _normalizar_chave) -- usado
-        # para não tentar inserir um produto_canonico com nome que já existe
-        # (uq_produto_canonico_caso_nome). A IA não coordena "produto novo"
-        # entre descrições de um mesmo lote nem enxerga um canônico fora do
-        # pré-filtro de embedding, então pode sugerir o mesmo nome como novo
-        # mais de uma vez dentro desta mesma execução.
-        canonicos_por_nome = {
-            _normalizar_chave(c["nome_canonico"]): c["id"] for c in canonicos_existentes
-        }
-        # Só entram no pré-filtro canônicos com embedding do modelo
-        # atualmente configurado -- um embedding de modelo antigo é tratado
-        # como inexistente, nunca comparado por cosseno contra um vetor de
-        # espaço diferente (ver app/models/models.py::ProdutoCanonico.embedding_modelo).
-        embeddings_canonicos = {
-            c.id: c.embedding
-            for c in canonicos_orm
-            if c.embedding and c.embedding_modelo == settings.gemini_embedding_model
-        }
+        def _carregar_catalogo() -> _CatalogoEmMemoria:
+            return _CatalogoEmMemoria(
+                db.query(ProdutoCanonico)
+                .filter(ProdutoCanonico.cliente_caso_id == cliente_caso_id)
+                .all()
+            )
 
-        chaves = list(grupos.keys())
+        catalogo = _carregar_catalogo()
+
+        chaves = list(itens_por_chave.keys())
+        total_lotes = -(-len(chaves) // TAMANHO_LOTE_IA)  # divisão com arredondamento para cima
         sugestoes_criadas = 0
         produtos_canonicos_criados = 0
+
+        def _falha(numero_lote: int, motivo: str) -> dict:
+            return {
+                "status": "falha_lote",
+                "motivo": motivo,
+                "lote_com_falha": numero_lote,
+                "total_lotes": total_lotes,
+                "lotes_salvos": numero_lote - 1,
+                "descricoes_unicas": len(chaves),
+                "itens_pendentes": len(itens_pendentes),
+                "produtos_canonicos_criados": produtos_canonicos_criados,
+                "sugestoes_criadas": sugestoes_criadas,
+            }
+
+        def _publicar_progresso(lotes_salvos: int) -> None:
+            if task_id is None:
+                return
+            # Best-effort: progresso é só informativo -- uma oscilação no
+            # backend de resultados não pode abortar uma execução saudável.
+            try:
+                task.update_state(
+                    state="PROGRESS",
+                    meta={
+                        "lotes_salvos": lotes_salvos,
+                        "total_lotes": total_lotes,
+                        "sugestoes_criadas": sugestoes_criadas,
+                    },
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Normalização: falha ao publicar progresso: %r", exc)
+
+        def _verificar_trava() -> None:
+            if task_id is not None and not trava_normalizacao.renovar(cliente_caso_id, task_id):
+                raise _TravaPerdida()
+
+        motivo_trava_perdida = (
+            "A trava da normalização expirou antes do fim; processamento "
+            "interrompido para não duplicar sugestões."
+        )
+
+        _publicar_progresso(0)
 
         # Catálogo pequeno: mantém o comportamento de sempre (lista cheia no
         # prompt, sem custo de embedding). Catálogo grande: gera embedding de
         # cada descrição uma vez, de antemão, e usa como pré-filtro em cada
         # lote -- ver LIMIAR_FILTRO_EMBEDDING acima.
-        usar_filtro_embedding = len(canonicos_existentes) > LIMIAR_FILTRO_EMBEDDING
+        usar_filtro_embedding = len(catalogo.existentes) > LIMIAR_FILTRO_EMBEDDING
         embeddings_descricoes: dict[str, list[float]] = {}
         if usar_filtro_embedding:
-            vetores = gerar_embeddings(
-                [descricao_original_por_chave[c] for c in chaves], task_type="RETRIEVAL_QUERY"
-            )
+            try:
+                vetores, erro = _executar_com_tentativas(
+                    db,
+                    "embedding das descrições",
+                    lambda tentativa: gerar_embeddings(
+                        [descricao_original_por_chave[c] for c in chaves], task_type="RETRIEVAL_QUERY"
+                    ),
+                    _verificar_trava,
+                )
+            except _TravaPerdida:
+                return _falha(1, motivo_trava_perdida)
+            if erro is not None:
+                return _falha(1, _motivo_falha(erro))
             embeddings_descricoes = dict(zip(chaves, vetores))
 
-        for i in range(0, len(chaves), TAMANHO_LOTE_IA):
-            lote_chaves = chaves[i : i + TAMANHO_LOTE_IA]
-            descricoes_lote = [descricao_original_por_chave[c] for c in lote_chaves]
+        for indice, inicio in enumerate(range(0, len(chaves), TAMANHO_LOTE_IA)):
+            numero_lote = indice + 1
+            lote_chaves = chaves[inicio : inicio + TAMANHO_LOTE_IA]
 
-            if usar_filtro_embedding:
-                ids_candidatos = selecionar_candidatos_similares(
+            def _tentar_lote(tentativa: int) -> dict:
+                nonlocal catalogo
+                if tentativa > 1:
+                    # O revisor pode ter transferido/apagado um canônico
+                    # enquanto a task roda (os lotes anteriores já estão
+                    # visíveis) -- recarrega em vez de repetir um erro de FK.
+                    catalogo = _carregar_catalogo()
+                return _processar_lote_normalizacao(
+                    db,
+                    cliente_caso_id,
                     lote_chaves,
+                    descricao_original_por_chave,
+                    itens_por_chave,
+                    catalogo,
+                    usar_filtro_embedding,
                     embeddings_descricoes,
-                    embeddings_canonicos,
-                    top_k=TOP_K_CANDIDATOS,
-                    max_total=MAX_CANDIDATOS_POR_LOTE,
                 )
-                candidatos_lote = [canonicos_por_id[cid] for cid in ids_candidatos]
-            else:
-                candidatos_lote = canonicos_existentes
 
-            resultados = sugerir_normalizacao(descricoes_lote, candidatos_lote)
+            try:
+                resultado_lote, erro = _executar_com_tentativas(
+                    db, f"lote {numero_lote} de {total_lotes}", _tentar_lote, _verificar_trava
+                )
+            except _TravaPerdida:
+                return _falha(numero_lote, motivo_trava_perdida)
+            if erro is not None:
+                return _falha(numero_lote, _motivo_falha(erro))
 
-            resultados_por_chave = {
-                _normalizar_chave(r.descricao_original): r for r in resultados
-            }
+            # Só depois do commit o lote passa a valer para os seguintes.
+            for canonico, chave_nome, embedding in resultado_lote["canonicos_novos"]:
+                catalogo.registrar(canonico, chave_nome, embedding)
+            sugestoes_criadas += resultado_lote["sugestoes_criadas"]
+            produtos_canonicos_criados += resultado_lote["produtos_canonicos_criados"]
+            _publicar_progresso(numero_lote)
 
-            for chave in lote_chaves:
-                resultado = resultados_por_chave.get(chave)
-                if resultado is None:
-                    continue  # IA não retornou sugestão para essa descrição
-
-                produto_canonico_id = resultado.produto_canonico_id
-                if produto_canonico_id is not None and produto_canonico_id not in ids_canonicos_existentes:
-                    produto_canonico_id = None  # segurança: IA apontou id inexistente
-
-                if produto_canonico_id is None:
-                    if resultado.novo_produto_canonico is None:
-                        continue  # sem correspondência e sem produto novo -- ignora
-
-                    chave_nome = _normalizar_chave(resultado.novo_produto_canonico.nome_canonico)
-                    produto_canonico_id = canonicos_por_nome.get(chave_nome)
-
-                    if produto_canonico_id is None:
-                        novo = ProdutoCanonico(
-                            cliente_caso_id=cliente_caso_id,
-                            nome_canonico=resultado.novo_produto_canonico.nome_canonico,
-                            categoria=resultado.novo_produto_canonico.categoria,
-                        )
-                        novo.embedding = serializar_embedding(gerar_embeddings([novo.nome_canonico])[0])
-                        novo.embedding_modelo = settings.gemini_embedding_model
-                        try:
-                            with db.begin_nested():
-                                db.add(novo)
-                                db.flush()  # garante novo.id
-                        except IntegrityError:
-                            # uq_produto_canonico_caso_nome: outra execução
-                            # concorrente desta task para o mesmo
-                            # cliente_caso_id criou esse nome entre a
-                            # consulta de canonicos_orm e este flush. Reusa o
-                            # canônico existente em vez de abortar a
-                            # transação inteira (e com ela todas as
-                            # sugestões já válidas deste lote).
-                            existente = (
-                                db.query(ProdutoCanonico)
-                                .filter(
-                                    ProdutoCanonico.cliente_caso_id == cliente_caso_id,
-                                    ProdutoCanonico.nome_canonico
-                                    == resultado.novo_produto_canonico.nome_canonico,
-                                )
-                                .one()
-                            )
-                            produto_canonico_id = existente.id
-                            novo_dict = {
-                                "id": existente.id,
-                                "nome_canonico": existente.nome_canonico,
-                                "categoria": existente.categoria,
-                            }
-                            if existente.embedding and existente.embedding_modelo == settings.gemini_embedding_model:
-                                embeddings_canonicos[existente.id] = existente.embedding
-                        else:
-                            produto_canonico_id = novo.id
-                            novo_dict = {
-                                "id": novo.id,
-                                "nome_canonico": novo.nome_canonico,
-                                "categoria": novo.categoria,
-                            }
-                            embeddings_canonicos[novo.id] = novo.embedding
-                            produtos_canonicos_criados += 1
-
-                        # Registra o canônico (criado agora ou reaproveitado
-                        # de uma colisão) nas estruturas em memória -- sem
-                        # isso, ele só existiria como id válido para a
-                        # próxima chamada da IA, mas não apareceria como
-                        # candidato real (nem na lista cheia, nem no
-                        # pré-filtro de embedding, nem na dedução por nome)
-                        # nos lotes seguintes desta mesma execução.
-                        canonicos_existentes.append(novo_dict)
-                        canonicos_por_id[produto_canonico_id] = novo_dict
-                        canonicos_por_nome[chave_nome] = produto_canonico_id
-                        ids_canonicos_existentes.add(produto_canonico_id)
-
-                for item in grupos[chave]:
-                    db.add(
-                        SugestaoNormalizacao(
-                            item_nota_id=item.id,
-                            produto_canonico_sugerido_id=produto_canonico_id,
-                            confianca=resultado.confianca,
-                            status=StatusRevisao.PENDENTE,
-                        )
-                    )
-                    sugestoes_criadas += 1
-
-        db.commit()
         return {
             "status": "ok",
             "descricoes_unicas": len(chaves),
             "itens_pendentes": len(itens_pendentes),
+            "total_lotes": total_lotes,
             "produtos_canonicos_criados": produtos_canonicos_criados,
             "sugestoes_criadas": sugestoes_criadas,
         }

@@ -1,8 +1,9 @@
 """
 Cobre a política de retry/backoff das chamadas ao SDK da Anthropic
-(app/ai/anthropic_retry.py) e sua aplicação nos dois call sites que migraram
-para Claude (normalizador_produtos, consulta_nl_sql). embeddings.py continua
-no Gemini -- ver tests/test_gemini_retry.py.
+(app/ai/anthropic_retry.py) e sua aplicação em consulta_nl_sql. O
+normalizador_produtos não usa essa política (o retry dele é o do lote, em
+app/workers/tasks.py). embeddings.py continua no Gemini -- ver
+tests/test_gemini_retry.py.
 """
 
 from unittest.mock import MagicMock
@@ -100,38 +101,15 @@ def _sem_espera(monkeypatch, funcao_decorada):
 
 
 class TestNormalizadorProdutos:
-    def test_retenta_erro_transitorio_e_devolve_resultado(self, monkeypatch):
+    def test_nao_retenta_por_conta_propria(self):
+        # O retry da normalização é o do lote (app/workers/tasks.py,
+        # TENTATIVAS_POR_LOTE) -- um retry aqui multiplicaria as tentativas.
         from app.ai import normalizador_produtos
 
-        _sem_espera(monkeypatch, normalizador_produtos._gerar_conteudo)
-        client = MagicMock()
-        client.messages.create.side_effect = [_internal_server_error(), "ok"]
-
-        resultado = normalizador_produtos._gerar_conteudo(client, model="m")
-
-        assert resultado == "ok"
-        assert client.messages.create.call_count == 2
-
-    def test_esgota_tentativas_e_relanca(self, monkeypatch):
-        from app.ai import normalizador_produtos
-
-        _sem_espera(monkeypatch, normalizador_produtos._gerar_conteudo)
         client = MagicMock()
         client.messages.create.side_effect = _internal_server_error()
 
         with pytest.raises(anthropic.InternalServerError):
-            normalizador_produtos._gerar_conteudo(client, model="m")
-
-        assert client.messages.create.call_count == 3
-
-    def test_erro_de_cliente_permanente_nao_retenta(self, monkeypatch):
-        from app.ai import normalizador_produtos
-
-        _sem_espera(monkeypatch, normalizador_produtos._gerar_conteudo)
-        client = MagicMock()
-        client.messages.create.side_effect = _bad_request_error()
-
-        with pytest.raises(anthropic.BadRequestError):
             normalizador_produtos._gerar_conteudo(client, model="m")
 
         assert client.messages.create.call_count == 1

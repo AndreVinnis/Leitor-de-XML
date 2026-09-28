@@ -53,6 +53,45 @@ def _sem_embedding_de_verdade(monkeypatch):
     monkeypatch.setattr("app.scripts.backfill_embeddings.gerar_embeddings", mock_embeddings)
 
 
+class TravaNormalizacaoFalsa:
+    """Substitui o Redis de app/core/trava_normalizacao.py por um dict, com
+    a mesma semântica (adquirir só se livre; renovar/liberar só pelo dono)."""
+
+    def __init__(self):
+        self.donos: dict[int, str] = {}
+
+    def adquirir(self, cliente_caso_id, task_id):
+        if cliente_caso_id in self.donos:
+            return False
+        self.donos[cliente_caso_id] = task_id
+        return True
+
+    def task_em_andamento(self, cliente_caso_id):
+        return self.donos.get(cliente_caso_id)
+
+    def renovar(self, cliente_caso_id, task_id):
+        return self.donos.get(cliente_caso_id) == task_id
+
+    def liberar(self, cliente_caso_id, task_id):
+        if self.donos.get(cliente_caso_id) == task_id:
+            del self.donos[cliente_caso_id]
+
+
+@pytest.fixture(autouse=True)
+def trava_normalizacao(monkeypatch):
+    """
+    Mesmo racional de _sem_broker_de_verdade: em CI não existe Redis, e a
+    rota de disparo e a task de normalização usam a trava por caso. Zera
+    também as esperas entre tentativas de um lote, para os testes de retry
+    não dormirem de verdade.
+    """
+    trava = TravaNormalizacaoFalsa()
+    for nome in ("adquirir", "task_em_andamento", "renovar", "liberar"):
+        monkeypatch.setattr(f"app.core.trava_normalizacao.{nome}", getattr(trava, nome))
+    monkeypatch.setattr("app.workers.tasks.ESPERAS_ENTRE_TENTATIVAS", (0, 0))
+    return trava
+
+
 @pytest.fixture
 def db_session_factory(monkeypatch):
     """
