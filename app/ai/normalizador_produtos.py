@@ -10,26 +10,77 @@ A IA nunca escreve direto no banco: só sugere, revisão humana decide.
 
 from typing import Optional
 
-from google import genai
-from google.genai import types
+import anthropic
 from pydantic import BaseModel
 
-from app.ai.gemini_retry import retry_gemini
+from app.ai.anthropic_retry import retry_anthropic
 from app.core.config import settings
 
-_client: Optional[genai.Client] = None
+_client: Optional[anthropic.Anthropic] = None
+
+# max_tokens é obrigatório na Anthropic (diferente do Gemini). Lote de até
+# TAMANHO_LOTE_IA=50 itens (app/workers/tasks.py) -- 50 sugestões em JSON
+# (descricao_original + confianca + produto_canonico_id/novo_produto_canonico)
+# ficam bem abaixo disso; o valor dá margem de segurança sem chegar perto do
+# teto de saída do modelo. Revisar junto se TAMANHO_LOTE_IA mudar.
+_MAX_TOKENS = 8000
+
+_NOME_TOOL_SUGESTOES = "registrar_sugestoes_normalizacao"
+
+_TOOL_SUGESTOES = {
+    "name": _NOME_TOOL_SUGESTOES,
+    "description": (
+        "Registra, para cada descrição recebida, a sugestão de normalização "
+        "correspondente (produto canônico existente ou novo), na mesma ordem."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "sugestoes": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "descricao_original": {"type": "string"},
+                        "confianca": {"type": "number"},
+                        "produto_canonico_id": {"type": ["integer", "null"]},
+                        "novo_produto_canonico": {
+                            "anyOf": [
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "nome_canonico": {"type": "string"},
+                                        "categoria": {"type": ["string", "null"]},
+                                    },
+                                    "required": ["nome_canonico"],
+                                },
+                                {"type": "null"},
+                            ]
+                        },
+                    },
+                    "required": ["descricao_original", "confianca"],
+                },
+            }
+        },
+        "required": ["sugestoes"],
+    },
+}
 
 
-def _get_client() -> genai.Client:
+def _get_client() -> anthropic.Anthropic:
     global _client
     if _client is None:
-        _client = genai.Client(api_key=settings.gemini_api_key)
+        # max_retries=0: o SDK da Anthropic já retenta 429/5xx/erro de rede
+        # por padrão (max_retries=2) -- zerar aqui evita duas camadas de
+        # retry sobrepostas (a do SDK + a do tenacity via retry_anthropic),
+        # que multiplicariam tentativas/backoffs de forma imprevisível.
+        _client = anthropic.Anthropic(api_key=settings.anthropic_api_key, max_retries=0)
     return _client
 
 
-@retry_gemini
-def _gerar_conteudo(client: genai.Client, **kwargs) -> types.GenerateContentResponse:
-    return client.models.generate_content(**kwargs)
+@retry_anthropic
+def _gerar_conteudo(client: anthropic.Anthropic, **kwargs) -> anthropic.types.Message:
+    return client.messages.create(**kwargs)
 
 
 class NovoProdutoCanonicoIA(BaseModel):
@@ -112,16 +163,21 @@ def sugerir_normalizacao(
 
     response = _gerar_conteudo(
         client,
-        model=settings.gemini_model,
-        contents=user_message,
-        config=types.GenerateContentConfig(
-            system_instruction=_SYSTEM_PROMPT,
-            response_mime_type="application/json",
-            response_schema=_RespostaNormalizacao,
-        ),
+        model=settings.anthropic_model,
+        max_tokens=_MAX_TOKENS,
+        system=_SYSTEM_PROMPT,
+        thinking={"type": "disabled"},
+        tools=[_TOOL_SUGESTOES],
+        tool_choice={"type": "tool", "name": _NOME_TOOL_SUGESTOES},
+        messages=[{"role": "user", "content": user_message}],
     )
 
-    resposta = response.parsed
-    if resposta is None:
-        resposta = _RespostaNormalizacao.model_validate_json(response.text)
+    tool_use = next((bloco for bloco in response.content if bloco.type == "tool_use"), None)
+    if tool_use is None:
+        raise RuntimeError(
+            "Resposta da IA sem bloco tool_use esperado "
+            f"(stop_reason={response.stop_reason!r})"
+        )
+
+    resposta = _RespostaNormalizacao.model_validate(tool_use.input)
     return resposta.sugestoes
