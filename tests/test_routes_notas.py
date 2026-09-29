@@ -1,4 +1,7 @@
+import io
+import zipfile
 from datetime import datetime
+from pathlib import Path
 
 from app.models.models import (
     ArquivoLote,
@@ -542,3 +545,117 @@ def test_download_valida_quantidade_de_ids(client, db_session_factory, logar_usu
 
     assert client.post("/api/notas/download", json={"ids": []}).status_code == 422
     assert client.post("/api/notas/download", json={"ids": list(range(1, 502))}).status_code == 422
+
+
+XML_COMPLETO = Path(__file__).parent / "fixtures" / "nfe_completa_exemplo.xml"
+
+
+def _xml_em_disco(pasta, nome, conteudo):
+    caminho = pasta / nome
+    caminho.parent.mkdir(parents=True, exist_ok=True)
+    caminho.write_bytes(conteudo)
+    return caminho
+
+
+def test_danfe_uma_nota_devolve_o_pdf(client, db_session_factory, logar_usuario, tmp_path, monkeypatch):
+    monkeypatch.setattr("app.api.routes_upload.UPLOAD_DIR", tmp_path)
+    xml = _xml_em_disco(tmp_path, "lote/nota1.xml", XML_COMPLETO.read_bytes())
+    session = db_session_factory()
+    usuario = _criar_usuario(session)
+    caso = _criar_caso(session)
+    nota = _nota_com_xml(session, caso.id, "A" * 44, "1", xml)
+    logar_usuario(usuario)
+
+    resposta = client.post("/api/notas/danfe", json={"ids": [nota.id]})
+
+    assert resposta.status_code == 200
+    assert resposta.headers["content-type"] == "application/pdf"
+    assert f'filename="DANFE_{"A" * 44}.pdf"' in resposta.headers["content-disposition"]
+    assert resposta.headers["x-arquivos-ausentes"] == "0"
+    assert resposta.content.startswith(b"%PDF-")
+
+
+def test_danfe_varias_notas_devolve_zip_e_conta_ausentes_e_falhas(
+    client, db_session_factory, logar_usuario, tmp_path, monkeypatch
+):
+    monkeypatch.setattr("app.api.routes_upload.UPLOAD_DIR", tmp_path)
+    xml_bom = XML_COMPLETO.read_bytes()
+    session = db_session_factory()
+    usuario = _criar_usuario(session)
+    caso = _criar_caso(session)
+    n1 = _nota_com_xml(session, caso.id, "A" * 44, "1", _xml_em_disco(tmp_path, "lote1/nota.xml", xml_bom))
+    n2 = _nota_com_xml(session, caso.id, "B" * 44, "2", _xml_em_disco(tmp_path, "lote2/nota.xml", xml_bom))
+    sem_arquivo = _nota_com_xml(session, caso.id, "C" * 44, "3", tmp_path / "lote1" / "sumiu.xml")
+    quebrada = _nota_com_xml(session, caso.id, "D" * 44, "4", _xml_em_disco(tmp_path, "lote1/q.xml", b"<NFe/>"))
+    logar_usuario(usuario)
+
+    resposta = client.post("/api/notas/danfe", json={"ids": [n1.id, n2.id, sem_arquivo.id, quebrada.id]})
+
+    assert resposta.status_code == 200
+    assert resposta.headers["content-type"] == "application/zip"
+    assert resposta.headers["x-arquivos-ausentes"] == "2"
+    with zipfile.ZipFile(io.BytesIO(resposta.content)) as zf:
+        assert sorted(zf.namelist()) == [f"DANFE_{'A' * 44}.pdf", f"DANFE_{'B' * 44}.pdf"]
+        assert all(zf.read(nome).startswith(b"%PDF-") for nome in zf.namelist())
+
+
+def test_danfe_marca_nota_cancelada(client, db_session_factory, logar_usuario, tmp_path, monkeypatch):
+    monkeypatch.setattr("app.api.routes_upload.UPLOAD_DIR", tmp_path)
+    chamadas = []
+
+    def gerador_falso(xml, cancelada):
+        chamadas.append(cancelada)
+        return b"%PDF-falso"
+
+    monkeypatch.setattr("app.api.routes_notas.gerar_danfe_pdf", gerador_falso)
+    session = db_session_factory()
+    usuario = _criar_usuario(session)
+    caso = _criar_caso(session)
+    nota = _criar_nota(session, caso.id, "A" * 44, "1", situacao=SituacaoNota.CANCELADA)
+    nota.arquivo_origem = str(_xml_em_disco(tmp_path, "lote/n.xml", b"<NFe/>"))
+    session.commit()
+    logar_usuario(usuario)
+
+    resposta = client.post("/api/notas/danfe", json={"ids": [nota.id]})
+
+    assert resposta.status_code == 200
+    assert chamadas == [True]
+
+
+def test_danfe_todas_com_falha_retorna_422(client, db_session_factory, logar_usuario, tmp_path, monkeypatch):
+    monkeypatch.setattr("app.api.routes_upload.UPLOAD_DIR", tmp_path)
+    session = db_session_factory()
+    usuario = _criar_usuario(session)
+    caso = _criar_caso(session)
+    nota = _nota_com_xml(session, caso.id, "A" * 44, "1", _xml_em_disco(tmp_path, "lote/q.xml", b"<quebrado"))
+    logar_usuario(usuario)
+
+    assert client.post("/api/notas/danfe", json={"ids": [nota.id]}).status_code == 422
+
+
+def test_danfe_ignora_caminho_fora_do_diretorio_de_uploads(
+    client, db_session_factory, logar_usuario, tmp_path, monkeypatch
+):
+    uploads = tmp_path / "uploads"
+    uploads.mkdir()
+    monkeypatch.setattr("app.api.routes_upload.UPLOAD_DIR", uploads)
+    fora = _xml_em_disco(tmp_path, "segredo.xml", XML_COMPLETO.read_bytes())
+    session = db_session_factory()
+    usuario = _criar_usuario(session)
+    caso = _criar_caso(session)
+    nota = _nota_com_xml(session, caso.id, "A" * 44, "1", fora)
+    logar_usuario(usuario)
+
+    assert client.post("/api/notas/danfe", json={"ids": [nota.id]}).status_code == 404
+
+
+def test_danfe_valida_quantidade_de_ids(client, db_session_factory, logar_usuario):
+    session = db_session_factory()
+    logar_usuario(_criar_usuario(session))
+
+    assert client.post("/api/notas/danfe", json={"ids": []}).status_code == 422
+    assert client.post("/api/notas/danfe", json={"ids": list(range(1, 202))}).status_code == 422
+
+
+def test_danfe_sem_autenticacao_retorna_401(client, db_session_factory):
+    assert client.post("/api/notas/danfe", json={"ids": [1]}).status_code == 401

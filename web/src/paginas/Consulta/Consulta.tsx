@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { consultar } from "../../api/consulta";
-import { baixarNotas } from "../../api/notas";
+import { baixarDanfes, baixarNotas, type FormatoDownload } from "../../api/notas";
 import { ErroApi } from "../../api/cliente";
 import type { ResultadoConsulta } from "../../api/tipos";
 import { Badge } from "../../componentes/Badge";
 import { Botao } from "../../componentes/Botao";
-import { BarraSelecaoNotas } from "../../componentes/BarraSelecaoNotas";
+import { BarraSelecaoNotas, mensagemAusentes } from "../../componentes/BarraSelecaoNotas";
 import { Card } from "../../componentes/Card";
 import { useToast } from "../../componentes/Toast";
 import estilos from "./Consulta.module.css";
@@ -53,7 +53,7 @@ export function Consulta() {
   const [resultado, setResultado] = useState<ResultadoConsulta | null>(salvo?.resultado ?? null);
   const [bloqueio, setBloqueio] = useState<string | null>(salvo?.bloqueio ?? null);
   const [selecionadas, setSelecionadas] = useState<Set<number>>(salvo?.selecionadas ?? new Set());
-  const [baixando, setBaixando] = useState(false);
+  const [baixando, setBaixando] = useState<FormatoDownload | null>(null);
   const [pagina, setPagina] = useState(salvo?.pagina ?? 0);
 
   useEffect(() => {
@@ -123,15 +123,16 @@ export function Consulta() {
     }
   }
 
-  async function handleBaixar() {
-    setBaixando(true);
+  async function handleBaixar(formato: FormatoDownload) {
+    setBaixando(formato);
     try {
-      const ausentes = await baixarNotas([...selecionadas]);
-      if (ausentes > 0) notificar(`${ausentes} XML(s) não foram encontrados no servidor e ficaram fora do arquivo.`, "erro");
+      const ids = [...selecionadas];
+      const ausentes = await (formato === "xml" ? baixarNotas(ids) : baixarDanfes(ids));
+      if (ausentes > 0) notificar(mensagemAusentes(formato, ausentes), "erro");
     } catch (excecao) {
       notificar(excecao instanceof ErroApi ? excecao.message : "Erro de comunicação com a API.", "erro");
     } finally {
-      setBaixando(false);
+      setBaixando(null);
     }
   }
 

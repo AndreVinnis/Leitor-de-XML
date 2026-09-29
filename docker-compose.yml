@@ -1,4 +1,6 @@
-name: Leitor-de-XML
+# Não mudar: o nome do projeto prefixa os volumes (leitodexml_db_data,
+# leitodexml_nfe_uploads). Trocar aqui aponta a stack para volumes novos e vazios.
+name: leitodexml
 services:
   db:
     image: mysql:8.0

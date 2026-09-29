@@ -1,4 +1,5 @@
 import io
+import logging
 import zipfile
 from datetime import date, timedelta
 from pathlib import Path
@@ -20,10 +21,15 @@ from app.models.models import (
     TipoNota,
     Usuario,
 )
+from app.relatorios.danfe import ErroGeracaoDanfe, gerar_danfe_pdf
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 LIMITE_DOWNLOAD_NOTAS = 500
+# Menor que o do XML: cada DANFE leva ~0,1 s para gerar, e 200 mantém o
+# download na casa dos 20 s.
+LIMITE_DOWNLOAD_DANFE = 200
 
 
 def _filtrar_notas(
@@ -164,6 +170,26 @@ def _caminho_xml_seguro(arquivo_origem: str | None) -> Path | None:
     return caminho
 
 
+def _notas_com_xml(ids_pedidos: list[int]) -> tuple[list[tuple[Nota, Path]], int]:
+    """
+    Carrega as notas pedidas e o caminho seguro do XML de cada uma. Devolve
+    as que têm XML em disco e quantas ficaram de fora (inexistentes ou sem
+    arquivo). 404 se nenhuma tiver XML.
+    """
+    ids = list(dict.fromkeys(ids_pedidos))
+    db: Session = SessionLocal()
+    try:
+        notas = db.query(Nota).filter(Nota.id.in_(ids)).all()
+        caminhos = [(n, _caminho_xml_seguro(n.arquivo_origem)) for n in notas]
+    finally:
+        db.close()
+
+    disponiveis = [(n, c) for n, c in caminhos if c is not None]
+    if not disponiveis:
+        raise HTTPException(status_code=404, detail="Nenhum XML encontrado para as notas pedidas.")
+    return disponiveis, len(ids) - len(disponiveis)
+
+
 @router.post("/download")
 async def baixar_notas(
     entrada: DownloadNotasEntrada, usuario: Usuario = Depends(usuario_atual_ativo)
@@ -173,18 +199,7 @@ async def baixar_notas(
     ou um ZIP se forem várias. Arquivos ausentes em disco são pulados e
     contados no header X-Arquivos-Ausentes.
     """
-    ids = list(dict.fromkeys(entrada.ids))
-    db: Session = SessionLocal()
-    try:
-        notas = db.query(Nota).filter(Nota.id.in_(ids)).all()
-        caminhos = [(n, _caminho_xml_seguro(n.arquivo_origem)) for n in notas]
-    finally:
-        db.close()
-
-    disponiveis = [(n, c) for n, c in caminhos if c is not None]
-    ausentes = len(ids) - len(disponiveis)
-    if not disponiveis:
-        raise HTTPException(status_code=404, detail="Nenhum XML encontrado para as notas pedidas.")
+    disponiveis, ausentes = _notas_com_xml(entrada.ids)
 
     cabecalhos = {"X-Arquivos-Ausentes": str(ausentes)}
     if len(disponiveis) == 1:
@@ -202,6 +217,49 @@ async def baixar_notas(
             usados.add(nome)
             zf.write(caminho, arcname=nome)
     cabecalhos["Content-Disposition"] = 'attachment; filename="notas_fiscais.zip"'
+    return Response(content=buffer.getvalue(), media_type="application/zip", headers=cabecalhos)
+
+
+class DownloadDanfeEntrada(BaseModel):
+    ids: list[int] = Field(min_length=1, max_length=LIMITE_DOWNLOAD_DANFE)
+
+
+@router.post("/danfe")
+def baixar_danfes(entrada: DownloadDanfeEntrada, usuario: Usuario = Depends(usuario_atual_ativo)):
+    """
+    Devolve o DANFE (PDF) das notas pedidas: o próprio PDF se for uma só, ou
+    um ZIP com um PDF por nota. Notas sem XML em disco ou cujo XML não gera
+    DANFE são puladas e contadas no header X-Arquivos-Ausentes.
+
+    `def` e não `async def` de propósito: a geração é CPU-bound, e assim o
+    FastAPI a roda no threadpool em vez de travar o event loop.
+    """
+    disponiveis, ausentes = _notas_com_xml(entrada.ids)
+
+    pdfs: list[tuple[str, bytes]] = []
+    for nota, caminho in disponiveis:
+        try:
+            pdf = gerar_danfe_pdf(caminho.read_bytes(), cancelada=nota.situacao == SituacaoNota.CANCELADA)
+        except (ErroGeracaoDanfe, OSError) as exc:
+            logger.warning("DANFE da nota %s não gerado: %s", nota.id, exc)
+            ausentes += 1
+            continue
+        pdfs.append((f"DANFE_{nota.chave_acesso}.pdf", pdf))
+
+    if not pdfs:
+        raise HTTPException(status_code=422, detail="Nenhuma das notas pedidas pôde ser convertida em DANFE.")
+
+    cabecalhos = {"X-Arquivos-Ausentes": str(ausentes)}
+    if len(pdfs) == 1:
+        nome, pdf = pdfs[0]
+        cabecalhos["Content-Disposition"] = f'attachment; filename="{nome}"'
+        return Response(content=pdf, media_type="application/pdf", headers=cabecalhos)
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        for nome, pdf in pdfs:
+            zf.writestr(nome, pdf)
+    cabecalhos["Content-Disposition"] = 'attachment; filename="danfes.zip"'
     return Response(content=buffer.getvalue(), media_type="application/zip", headers=cabecalhos)
 
 

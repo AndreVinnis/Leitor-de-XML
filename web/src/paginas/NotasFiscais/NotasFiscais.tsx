@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { baixarNotas, listarIdsNotas, listarNotas } from "../../api/notas";
+import { baixarDanfes, baixarNotas, listarIdsNotas, listarNotas, type FormatoDownload } from "../../api/notas";
 import { ErroApi } from "../../api/cliente";
 import type { StatusNota, TipoNota } from "../../api/tipos";
 import { Select } from "../../componentes/Select";
@@ -9,7 +9,7 @@ import { Card } from "../../componentes/Card";
 import { Badge, type StatusBadge } from "../../componentes/Badge";
 import { Tabela, type ColunaTabela } from "../../componentes/Tabela";
 import { Paginacao } from "../../componentes/Paginacao";
-import { BarraSelecaoNotas } from "../../componentes/BarraSelecaoNotas";
+import { BarraSelecaoNotas, mensagemAusentes } from "../../componentes/BarraSelecaoNotas";
 import { useToast } from "../../componentes/Toast";
 import estilos from "./NotasFiscais.module.css";
 
@@ -85,7 +85,7 @@ export function NotasFiscais() {
 
   const [selecionadas, setSelecionadas] = useState<Set<number>>(new Set());
   const [selecionandoTodas, setSelecionandoTodas] = useState(false);
-  const [baixando, setBaixando] = useState(false);
+  const [baixando, setBaixando] = useState<FormatoDownload | null>(null);
   // Filtros e página vivem na URL (não em useState): ao abrir uma nota e voltar,
   // o histórico restaura a lista exatamente como estava. `replace` evita que
   // cada mudança de filtro vire uma entrada do histórico.
@@ -194,15 +194,16 @@ export function NotasFiscais() {
     }
   }
 
-  async function handleBaixar() {
-    setBaixando(true);
+  async function handleBaixar(formato: FormatoDownload) {
+    setBaixando(formato);
     try {
-      const ausentes = await baixarNotas([...selecionadas]);
-      if (ausentes > 0) notificar(`${ausentes} XML(s) não foram encontrados no servidor e ficaram fora do arquivo.`, "erro");
+      const ids = [...selecionadas];
+      const ausentes = await (formato === "xml" ? baixarNotas(ids) : baixarDanfes(ids));
+      if (ausentes > 0) notificar(mensagemAusentes(formato, ausentes), "erro");
     } catch (excecao) {
       notificar(excecao instanceof ErroApi ? excecao.message : "Erro de comunicação com a API.", "erro");
     } finally {
-      setBaixando(false);
+      setBaixando(null);
     }
   }
 
