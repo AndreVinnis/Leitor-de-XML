@@ -4,6 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Leitor de XML</title>
+    <script>
+      // Aplica o tema salvo antes do primeiro paint, para não piscar claro ao
+      // recarregar no modo escuro. Mesma chave de src/tema/ContextoTema.tsx.
+      try {
+        if (localStorage.getItem("leitor-xml:tema") === "escuro") {
+          document.documentElement.dataset.tema = "escuro";
+        }
+      } catch (e) {}
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

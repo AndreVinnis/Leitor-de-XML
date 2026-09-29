@@ -7,6 +7,7 @@ import { atualizarCaso, criarCaso } from "../api/casos";
 import type { ClienteCaso } from "../api/tipos";
 import { useToast } from "../componentes/Toast";
 import { Botao } from "../componentes/Botao";
+import { BotaoTema } from "../componentes/BotaoTema";
 import { CampoTexto } from "../componentes/CampoTexto";
 import { Modal } from "../componentes/Modal";
 import { ErroApi } from "../api/cliente";
@@ -147,6 +148,7 @@ export function LayoutApp() {
         <div className={estilos.logo}>
           <div className={estilos.logoCirculo} />
           <span className={estilos.logoTexto}>Leitor de XML</span>
+          <BotaoTema />
         </div>
 
         <div className={estilos.grupoDireita}>

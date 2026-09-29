@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
+import { ProvedorTema } from "./tema/ContextoTema";
 import "./estilos/global.css";
 
 const raiz = document.getElementById("root");
@@ -8,6 +9,8 @@ if (!raiz) throw new Error("Elemento #root não encontrado em index.html");
 
 createRoot(raiz).render(
   <StrictMode>
-    <App />
+    <ProvedorTema>
+      <App />
+    </ProvedorTema>
   </StrictMode>
 );
