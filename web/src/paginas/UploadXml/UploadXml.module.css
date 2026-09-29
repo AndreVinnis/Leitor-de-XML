@@ -71,7 +71,7 @@
 .dropAreaTitulo {
   font-size: 15px;
   font-weight: 600;
-  color: var(--cor-primaria-escura);
+  color: var(--cor-texto-destaque);
 }
 
 .dropAreaSubtitulo {

@@ -14,7 +14,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  color: var(--cor-primaria);
+  color: var(--cor-link);
   font-size: 13px;
   font-weight: 500;
   text-decoration: none;

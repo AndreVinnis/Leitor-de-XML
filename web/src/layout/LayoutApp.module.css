@@ -167,7 +167,7 @@
 
 .itemCasoEditar:hover {
   background: var(--cor-superficie);
-  color: var(--cor-primaria);
+  color: var(--cor-link);
 }
 
 .itemCasoTextos {
@@ -189,7 +189,7 @@
 }
 
 .itemCasoCheck {
-  color: var(--cor-primaria);
+  color: var(--cor-link);
   font-weight: 700;
   font-size: 13px;
   flex-shrink: 0;
@@ -225,7 +225,7 @@
 .botaoNovoCaso {
   background: none;
   border: none;
-  color: var(--cor-primaria);
+  color: var(--cor-link);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -333,7 +333,7 @@
 
 .navItemAtivo {
   background: var(--cor-accent-fundo);
-  color: var(--cor-primaria);
+  color: var(--cor-link);
   cursor: pointer;
 }
 

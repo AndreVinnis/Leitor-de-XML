@@ -24,7 +24,7 @@
 
 .secundario {
   background: var(--cor-superficie);
-  color: var(--cor-primaria);
+  color: var(--cor-link);
   border-color: var(--cor-primaria);
 }
 

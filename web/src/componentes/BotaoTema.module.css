@@ -1,0 +1,25 @@
+.botao {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--cor-borda);
+  border-radius: 50%;
+  background: var(--cor-superficie);
+  color: var(--cor-texto-secundario);
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.botao:hover {
+  background: var(--cor-fundo);
+  color: var(--cor-texto);
+}
+
+.botao:focus-visible {
+  outline: 2px solid var(--cor-link);
+  outline-offset: 2px;
+}

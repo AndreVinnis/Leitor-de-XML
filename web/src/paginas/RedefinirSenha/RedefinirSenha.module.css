@@ -108,7 +108,7 @@
 }
 
 .linkEntrar {
-  color: var(--cor-primaria);
+  color: var(--cor-link);
   font-weight: 600;
   text-decoration: none;
 }

@@ -20,7 +20,7 @@
 }
 
 .campo:focus {
-  outline: 2px solid var(--cor-primaria);
+  outline: 2px solid var(--cor-link);
   outline-offset: 1px;
 }
 
