@@ -18,7 +18,7 @@
 }
 
 .primaria {
-  color: var(--cor-primaria);
+  color: var(--cor-link);
 }
 
 .accent {
@@ -32,5 +32,5 @@
 .verDetalhes {
   font-size: 13px;
   font-weight: 600;
-  color: var(--cor-primaria);
+  color: var(--cor-link);
 }

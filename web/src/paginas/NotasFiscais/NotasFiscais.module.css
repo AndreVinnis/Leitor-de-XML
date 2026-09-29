@@ -46,7 +46,7 @@
 .limparFiltros {
   border: 1.5px solid var(--cor-primaria);
   padding: 0 15.5px;
-  color: var(--cor-primaria);
+  color: var(--cor-link);
   font-weight: 600;
 }
 

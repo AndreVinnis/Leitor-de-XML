@@ -47,7 +47,7 @@
 .linkVerTodas {
   font-size: 13px;
   font-weight: 600;
-  color: var(--cor-primaria);
+  color: var(--cor-link);
   text-decoration: none;
 }
 

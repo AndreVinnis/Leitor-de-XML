@@ -55,7 +55,7 @@
   border: 1px solid var(--cor-primaria);
   border-radius: var(--raio-borda);
   background: transparent;
-  color: var(--cor-primaria);
+  color: var(--cor-link);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;

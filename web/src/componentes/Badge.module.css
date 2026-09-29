@@ -16,7 +16,7 @@
 
 .pendente {
   background: var(--cor-accent-fundo);
-  color: var(--cor-primaria-escura);
+  color: var(--cor-pendente);
 }
 
 .erro {
@@ -32,10 +32,10 @@
 
 .info {
   background: var(--cor-accent-fundo);
-  color: var(--cor-primaria);
+  color: var(--cor-link);
 }
 
 .evento {
   background: var(--cor-accent-fundo);
-  color: var(--cor-primaria);
+  color: var(--cor-link);
 }
