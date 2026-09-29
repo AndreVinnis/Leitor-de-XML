@@ -6,6 +6,11 @@
   margin-bottom: 12px;
 }
 
+.aviso {
+  font-size: 13px;
+  color: var(--cor-texto-secundario);
+}
+
 .resumo {
   margin-left: auto;
   font-size: 14px;

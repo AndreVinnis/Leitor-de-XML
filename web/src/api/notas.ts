@@ -51,6 +51,19 @@ export function baixarNotas(ids: number[]): Promise<number> {
   return baixarArquivoPost("/api/notas/download", { ids }, ids.length === 1 ? "nota.xml" : "notas_fiscais.zip");
 }
 
+export type FormatoDownload = "xml" | "danfe";
+
+// Mesmo teto do backend (LIMITE_DOWNLOAD_DANFE em app/api/routes_notas.py).
+export const LIMITE_DOWNLOAD_DANFE = 200;
+
+/**
+ * Baixa o DANFE em PDF (1 nota) ou um ZIP com um PDF por nota (várias).
+ * Devolve quantas notas ficaram de fora (sem XML no servidor ou XML que não gera DANFE).
+ */
+export function baixarDanfes(ids: number[]): Promise<number> {
+  return baixarArquivoPost("/api/notas/danfe", { ids }, ids.length === 1 ? "DANFE.pdf" : "danfes.zip");
+}
+
 export function obterNota(notaId: number): Promise<NotaDetalhe> {
   return get<NotaDetalhe>(`/api/notas/${notaId}`);
 }
