@@ -11,8 +11,17 @@ camada de NL→SQL ainda precisam ser implementados.
    ```bash
    cp .env.example .env
    ```
-   Edite `.env` e coloque sua `GEMINI_API_KEY` (não é usada ainda
-   neste scaffold, mas já deixamos o lugar certo para ela).
+   Edite `.env` e coloque suas chaves (`ANTHROPIC_API_KEY`,
+   `GEMINI_API_KEY`) e uma `SECRET_KEY` forte. **A API e o worker não sobem
+   sem ela** (vazia, `change-me` ou com menos de 32 caracteres são
+   recusadas, porque essa chave assina as sessões e os links de aprovação).
+   Para gerar uma:
+   ```bash
+   python -c "import secrets; print(secrets.token_urlsafe(48))"
+   ```
+   Defina também `MYSQL_CONSULTA_PASSWORD` (senha do usuário somente
+   leitura do NL->SQL, ver passo 3). Detalhes de cada camada de segurança em
+   `Documentação/Segurança.md`.
 
 2. Suba os containers:
    ```bash
@@ -35,6 +44,19 @@ camada de NL→SQL ainda precisam ser implementados.
    docker compose exec api alembic upgrade head
    ```
    Em um banco novo (do zero), `alembic upgrade head` sozinho já cria tudo.
+
+   Depois das migrations, crie o usuário MySQL somente leitura usado pela
+   tela de Consulta (NL->SQL). Ele só tem `SELECT` em `notas`, `itens_nota`
+   e `produtos_canonicos`, e precisa rodar depois do `upgrade head` porque
+   o MySQL não aceita `GRANT` em tabela que ainda não existe. O script é
+   idempotente, então pode rodar de novo para trocar a senha:
+   ```bash
+   docker compose exec db sh /scripts/criar_usuario_consulta.sh
+   ```
+   Em seguida, coloque no `.env` e reinicie a API:
+   `DATABASE_URL_CONSULTA=mysql+pymysql://nfe_consulta:<MYSQL_CONSULTA_PASSWORD>@db:3306/nfe_sistema`.
+   Sem essa variável a consulta continua funcionando, só que com o usuário
+   principal do banco (a API avisa no log).
 
 4. Crie o primeiro usuário administrador (precisa existir alguém pra
    aprovar os próximos cadastros):
@@ -124,34 +146,28 @@ camada de NL→SQL ainda precisam ser implementados.
    também uma frase-resposta em PT-BR com os valores preenchidos
    deterministicamente pelo backend (`app/core/resposta_consulta.py` — a IA
    nunca escreve o número) e a tabela de fontes (notas/itens) usada no
-   cálculo. Falta conexão de banco somente leitura como camada extra de
-   defesa (ver limitação anotada em `app/core/sql_seguranca.py`).
+   cálculo. O SQL gerado roda com um usuário MySQL somente leitura
+   (`DATABASE_URL_CONSULTA`, ver o passo 3 de "Como rodar localmente").
 6. **Camada de explicação**: resumir achados de reconciliação em texto
    para o advogado, sem tirar conclusões jurídicas.
 7. **Controle de acesso por cliente/caso** — login e cadastro com
    aprovação já existem (item acima), mas `cliente_caso_id` ainda é
    aceito nas rotas de notas/produtos sem checar se o usuário logado tem
    permissão sobre aquele cliente/caso.
-8. **Endurecer `app/core/sql_seguranca.py::validar_e_finalizar_sql`** —
-   revisão crítica (2026-09-26) achou bypasses que o validador atual
-   aprova sem erro:
-   - `... WHERE situacao='autorizada' OR cliente_caso_id = :cliente_caso_id`
-     devolve dados de todos os casos (o validador só exige que o
-     placeholder *apareça* na query, não que ele efetivamente filtre).
-   - `... -- :cliente_caso_id` joga o placeholder para dentro de um
-     comentário SQL (passa na checagem de presença, mas não filtra nada;
-     de quebra comenta também o `LIMIT` que o validador tentaria
-     acrescentar).
+8. ~~Endurecer `app/core/sql_seguranca.py::validar_e_finalizar_sql`~~ —
+   **feito em 2026-09-29** (ver `Documentação/Segurança.md`): o validador
+   usa um parser SQL (`sqlglot`) no lugar de regex, recusa tabela fora da
+   whitelist em qualquer posição (join por vírgula, subquery, UNION),
+   comentários, variáveis `@`, funções como `SLEEP`/`BENCHMARK`/`USER()` e
+   LIMIT acima de 200, e a execução usa o usuário somente leitura.
+   Continuam em aberto, conscientemente:
+   - `... OR cliente_caso_id = :cliente_caso_id` ainda devolve dados de
+     outros casos. Isso é coerente com a ausência deliberada de isolamento
+     por caso entre usuários (item 7).
    - Uma consulta que não usa a tabela `notas` diretamente (ex.: filtra
      `itens_nota` por uma subquery em `produtos_canonicos`) escapa da
      exigência de mencionar `situacao`, deixando nota cancelada entrar em
-     soma/contagem.
-   - Falta a conexão de banco somente leitura (grant `SELECT`-only) como
-     camada extra de defesa, já anotada como limitação conhecida no
-     docstring do módulo.
-
-   Prioridade alta antes de rodar com dado real de cliente — afeta toda
-   consulta NL→SQL (item 5), não só perguntas objetivas.
+     soma/contagem. É um problema de exatidão, não de segurança.
 
 ## Estrutura de pastas
 
