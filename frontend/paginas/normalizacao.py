@@ -194,9 +194,10 @@ def _exibir_lista(caso_id: int) -> None:
         linha[3].write(item["categoria"] or "--")
         linha[4].write(f"{item['confianca']:.0%}")
         linha[5].write(item["status"])
-        # Sugestão já revisada (confirmada ou rejeitada) não deve ser
-        # revisada de novo -- os botões ficam desabilitados, mas visíveis,
-        # para não desalinhar as colunas das demais linhas.
+        # Confirmar/rejeitar só valem para sugestão pendente -- ficam
+        # desabilitados, mas visíveis, para não desalinhar as colunas. Já o
+        # ✎ (corrigir) segue liberado: a rota aceita pendente, rejeitada e
+        # confirmada.
         ja_revisada = item["status"] != "pendente"
         if linha[6].button(
             "✓", key=f"confirmar_{item['id']}", help="Confirmar sugestão", disabled=ja_revisada
@@ -207,7 +208,7 @@ def _exibir_lista(caso_id: int) -> None:
         ):
             _executar_acao_unitaria(rejeitar_sugestao, item["id"])
         if linha[8].button(
-            "✎", key=f"corrigir_{item['id']}", help="Escolher outro produto canônico", disabled=ja_revisada
+            "✎", key=f"corrigir_{item['id']}", help="Escolher outro produto canônico"
         ):
             chave_aberto = f"corrigir_aberto_{item['id']}"
             st.session_state[chave_aberto] = not st.session_state.get(chave_aberto, False)
@@ -233,7 +234,7 @@ def _exibir_lista(caso_id: int) -> None:
 def _exibir_correcao_sugestao(item: dict, canonicos: list) -> None:
     """
     Bloco inline (aberto pelo botão ✎ da linha) para escolher, numa sugestão
-    ainda pendente, um produto canônico diferente do sugerido pela IA --
+    (pendente, rejeitada ou confirmada), um produto canônico diferente do sugerido pela IA --
     existente (selectbox) ou recém-criado ("+ Criar novo", que revela os
     campos de nome/categoria).
     """
@@ -243,8 +244,13 @@ def _exibir_correcao_sugestao(item: dict, canonicos: list) -> None:
     }
     rotulos["novo"] = "+ Criar novo"
 
-    sugerido_id = item["produto_canonico_sugerido_id"]
-    indice_padrao = opcoes.index(sugerido_id) if sugerido_id in opcoes else 0
+    # Só a sugestão pendente abre no sugerido pela IA. Nas demais, abre no
+    # canônico vinculado ao item (se houver): a IA já foi rejeitada/corrigida.
+    if item["status"] == "pendente":
+        pre_selecionado_id = item["produto_canonico_sugerido_id"]
+    else:
+        pre_selecionado_id = item.get("produto_canonico_vinculado_id")
+    indice_padrao = opcoes.index(pre_selecionado_id) if pre_selecionado_id in opcoes else 0
 
     with st.container(border=True):
         st.caption(f"Corrigir sugestão {item['id']}: escolha outro produto canônico")
