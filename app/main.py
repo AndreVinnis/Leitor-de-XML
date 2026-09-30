@@ -18,6 +18,7 @@ from app.api import (
 from app.core.config import settings
 from app.core.csrf import NOME_HEADER_ANTI_CSRF, ExigirHeaderAntiCsrfMiddleware
 from app.core.database import async_engine
+from app.core.limite_corpo import LimiteTamanhoCorpoMiddleware
 from app.core.sessao_deslizante import SessaoDeslizanteMiddleware
 
 
@@ -47,10 +48,13 @@ app = FastAPI(
 
 # Ordem importa: add_middleware empilha por fora a cada chamada (a última
 # chamada vira a mais externa), então a ordem abaixo roda, num request,
-# CORS -> CSRF -> sessão deslizante -> rotas. CORS precisa ser a mais externa
-# para anexar cabeçalho até em resposta de erro (ex.: 403 do CSRF).
+# CORS -> teto de corpo -> CSRF -> sessão deslizante -> rotas. CORS precisa
+# ser a mais externa para anexar cabeçalho até em resposta de erro (ex.: 403
+# do CSRF, 413 do teto de corpo). O teto de corpo vem antes de tudo que lê o
+# corpo (app/core/limite_corpo.py).
 app.add_middleware(SessaoDeslizanteMiddleware)
 app.add_middleware(ExigirHeaderAntiCsrfMiddleware)
+app.add_middleware(LimiteTamanhoCorpoMiddleware)
 
 # O frontend React (web/) roda atrás do proxy do Vite na mesma origem da
 # API (produção também -- ver Documentação/Deploy e Operação), então CORS

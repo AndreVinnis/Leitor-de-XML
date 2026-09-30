@@ -1,7 +1,7 @@
-from typing import AsyncGenerator, Optional
+from typing import AsyncGenerator, Optional, Union
 
 from fastapi import Depends, HTTPException, Request, status
-from fastapi_users import BaseUserManager, FastAPIUsers, IntegerIDMixin
+from fastapi_users import BaseUserManager, FastAPIUsers, IntegerIDMixin, InvalidPasswordException, schemas
 from fastapi_users.authentication import (
     AuthenticationBackend,
     BearerTransport,
@@ -21,9 +21,25 @@ async def get_user_db(session: AsyncSession = Depends(get_async_session)):
     yield SQLAlchemyUserDatabase(session, Usuario)
 
 
+TAMANHO_MINIMO_SENHA = 8
+
+
 class UserManager(IntegerIDMixin, BaseUserManager[Usuario, int]):
     reset_password_token_secret = settings.secret_key
     verification_token_secret = settings.secret_key
+
+    async def validate_password(
+        self, password: str, user: Union[schemas.UC, Usuario]
+    ) -> None:
+        # O fastapi-users não impõe regra nenhuma por padrão. Vale no cadastro,
+        # na redefinição por e-mail e no PATCH /users/me. O mínimo é o mesmo
+        # que o React já exige (minLength=8 em CriarConta/RedefinirSenha).
+        if len(password) < TAMANHO_MINIMO_SENHA:
+            raise InvalidPasswordException(
+                reason=f"A senha precisa ter pelo menos {TAMANHO_MINIMO_SENHA} caracteres."
+            )
+        if user.email and user.email.lower() in password.lower():
+            raise InvalidPasswordException(reason="A senha não pode conter o e-mail.")
 
     async def on_after_register(self, user: Usuario, request: Optional[Request] = None) -> None:
         # O router de registro do fastapi-users cria o usuário com

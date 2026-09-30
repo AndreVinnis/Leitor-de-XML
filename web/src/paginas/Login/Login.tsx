@@ -20,6 +20,7 @@ export function Login() {
   const [emailRecuperacao, setEmailRecuperacao] = useState("");
   const [enviandoRecuperacao, setEnviandoRecuperacao] = useState(false);
   const [recuperacaoEnviada, setRecuperacaoEnviada] = useState(false);
+  const [erroRecuperacao, setErroRecuperacao] = useState<string | null>(null);
 
   async function handleSubmit(evento: FormEvent) {
     evento.preventDefault();
@@ -33,6 +34,10 @@ export function Login() {
         // ainda pendente de aprovação (on_after_register força
         // is_active=False) -- as duas causas são indistinguíveis pela API.
         setErro("E-mail ou senha incorretos, ou o cadastro ainda está pendente de aprovação por um administrador.");
+      } else if (excecao instanceof ErroApi && excecao.status === 429) {
+        // Limite de tentativas (app/core/limite_taxa.py): o detail já diz
+        // quantos minutos esperar.
+        setErro(excecao.message);
       } else {
         setErro("Não foi possível entrar. Tente novamente em alguns instantes.");
       }
@@ -42,13 +47,22 @@ export function Login() {
   async function handleRecuperacao(evento: FormEvent) {
     evento.preventDefault();
     setEnviandoRecuperacao(true);
+    setErroRecuperacao(null);
     try {
       await solicitarRedefinicaoSenha(emailRecuperacao);
-    } finally {
       // A API sempre responde 202, exista ou não o e-mail -- a mensagem de
       // sucesso é fixa e não revela se o e-mail está cadastrado.
-      setEnviandoRecuperacao(false);
       setRecuperacaoEnviada(true);
+    } catch (excecao) {
+      // 429 (limite de tentativas) não pode aparecer como "enviado": nenhum
+      // e-mail saiu. O detail já diz quantos minutos esperar.
+      if (excecao instanceof ErroApi && excecao.status === 429) {
+        setErroRecuperacao(excecao.message);
+      } else {
+        setErroRecuperacao("Não foi possível enviar o link agora. Tente novamente em alguns instantes.");
+      }
+    } finally {
+      setEnviandoRecuperacao(false);
     }
   }
 
@@ -122,6 +136,7 @@ export function Login() {
                     onChange={(evento) => setEmailRecuperacao(evento.target.value)}
                     required
                   />
+                  {erroRecuperacao && <p className={estilos.mensagemErro}>{erroRecuperacao}</p>}
                   <Botao type="submit" variante="secundario" disabled={enviandoRecuperacao}>
                     {enviandoRecuperacao ? "Enviando..." : "Enviar link de redefinição"}
                   </Botao>

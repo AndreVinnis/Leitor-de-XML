@@ -54,6 +54,13 @@
 .acaoConsultar {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+}
+
+.contadorPergunta {
+  font-size: 12px;
+  color: var(--cor-texto-secundario);
 }
 
 .blocoResposta {

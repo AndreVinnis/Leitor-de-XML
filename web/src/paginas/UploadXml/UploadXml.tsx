@@ -119,7 +119,18 @@ export function UploadXml() {
 
   function adicionarArquivos(novos: FileList | null) {
     if (!novos || novos.length === 0) return;
-    setArquivos((atuais) => [...atuais, ...Array.from(novos)]);
+    // O backend recusa o lote inteiro se houver um arquivo que não seja
+    // .xml (routes_upload._nome_arquivo_seguro). O diálogo já filtra por
+    // accept=".xml", mas arrastar e soltar uma pasta não -- filtra aqui e
+    // avisa o que ficou de fora.
+    const lista = Array.from(novos);
+    const xmls = lista.filter((arquivo) => arquivo.name.toLowerCase().endsWith(".xml"));
+    const ignorados = lista.length - xmls.length;
+    if (ignorados > 0) {
+      notificar(`${ignorados} arquivo(s) ignorado(s) por não serem .xml.`, "erro");
+    }
+    if (xmls.length === 0) return;
+    setArquivos((atuais) => [...atuais, ...xmls]);
   }
 
   function removerArquivo(indice: number) {

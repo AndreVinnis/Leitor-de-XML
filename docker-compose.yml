@@ -10,10 +10,14 @@ services:
       MYSQL_DATABASE: ${MYSQL_DATABASE:-nfe_sistema}
       MYSQL_USER: ${MYSQL_USER:-nfe_user}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-nfe_pass}
+      # Senha do usuário somente leitura do NL->SQL, usada por
+      # docker/mysql/criar_usuario_consulta.sh (ver README).
+      MYSQL_CONSULTA_PASSWORD: ${MYSQL_CONSULTA_PASSWORD:-}
     ports:
       - "3306:3306"
     volumes:
       - db_data:/var/lib/mysql
+      - ./docker/mysql:/scripts:ro
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 5s
@@ -37,7 +41,14 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    # --proxy-headers: usa o X-Forwarded-For do proxy do Vite como IP do
+    # cliente (limite de tentativas por IP, app/core/limite_taxa.py), mas só
+    # quando a conexão vem de um IP em FORWARDED_ALLOW_IPS -- por padrão, o IP
+    # fixo do container `web` (ver `networks` no fim do arquivo). Com um IP
+    # exato, o uvicorn pega o último endereço não confiável do header, que é
+    # o que o Vite acrescenta. Nunca usar "*": com "*" o uvicorn 0.30 pega o
+    # primeiro endereço do header, que o próprio cliente escolhe.
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --proxy-headers --forwarded-allow-ips ${FORWARDED_ALLOW_IPS:-172.28.50.10}
     volumes:
       - .:/code
       - nfe_uploads:/tmp/nfe_uploads
@@ -95,6 +106,11 @@ services:
     command: npm run dev -- --host 0.0.0.0 --port 5173
     ports:
       - "5173:5173"
+    networks:
+      default:
+        # IP fixo: é o único endereço de onde a API aceita X-Forwarded-For
+        # (FORWARDED_ALLOW_IPS no serviço api).
+        ipv4_address: 172.28.50.10
     environment:
       # Vazio de propósito: o browser chama caminho relativo (/api/...), que
       # o proxy do Vite (web/vite.config.ts, roda dentro deste container)
@@ -109,6 +125,16 @@ services:
       - web_node_modules:/code/node_modules
     depends_on:
       - api
+
+networks:
+  default:
+    # Sub-rede fixa só para o container `web` ter IP conhecido (ver acima).
+    # Se colidir com alguma rede local/VPN, troque aqui, em ipv4_address do
+    # `web` e em FORWARDED_ALLOW_IPS. Mudar isto exige `docker compose down`
+    # antes do próximo `up` (a rede é recriada).
+    ipam:
+      config:
+        - subnet: 172.28.50.0/24
 
 volumes:
   db_data:

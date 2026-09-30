@@ -13,6 +13,7 @@ import getpass
 
 from fastapi_users.password import PasswordHelper
 
+from app.core.auth import TAMANHO_MINIMO_SENHA
 from app.core.database import SessionLocal
 from app.models.models import RoleUsuario, StatusCadastro, Usuario
 
@@ -42,6 +43,10 @@ def criar_admin(nome: str, email: str, senha: str) -> None:
         db.close()
 
 
+def email_contido(email: str, senha: str) -> bool:
+    return email.lower() in senha.lower()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Cria o primeiro usuário administrador.")
     parser.add_argument("--nome", required=True)
@@ -52,6 +57,13 @@ def main() -> None:
     confirmacao = getpass.getpass("Confirme a senha: ")
     if senha != confirmacao:
         raise SystemExit("As senhas não coincidem.")
+    # Mesma regra do UserManager.validate_password (app/core/auth.py), que
+    # este script não passa por usar o PasswordHelper direto.
+    if len(senha) < TAMANHO_MINIMO_SENHA or email_contido(args.email, senha):
+        raise SystemExit(
+            f"A senha precisa ter pelo menos {TAMANHO_MINIMO_SENHA} caracteres "
+            "e não pode conter o e-mail."
+        )
 
     criar_admin(args.nome, args.email, senha)
 

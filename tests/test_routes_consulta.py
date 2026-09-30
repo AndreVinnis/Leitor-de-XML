@@ -440,3 +440,73 @@ def test_consulta_sem_autenticacao_retorna_401(client, db_session_factory):
         "/api/consulta", json={"pergunta": "qualquer coisa", "cliente_caso_id": 1}
     )
     assert resp.status_code == 401
+
+
+def test_pergunta_acima_do_tamanho_maximo_retorna_422_sem_chamar_ia(
+    client, db_session_factory, logar_usuario, monkeypatch
+):
+    from unittest.mock import MagicMock
+
+    from app.api.routes_consulta import TAMANHO_MAXIMO_PERGUNTA
+
+    gerar = MagicMock()
+    monkeypatch.setattr("app.api.routes_consulta.gerar_plano_consulta", gerar)
+    session = db_session_factory()
+    usuario = _criar_usuario(session)
+    session.close()
+    logar_usuario(usuario)
+
+    resp = client.post(
+        "/api/consulta",
+        json={"pergunta": "x" * (TAMANHO_MAXIMO_PERGUNTA + 1), "cliente_caso_id": 1},
+    )
+
+    assert resp.status_code == 422
+    gerar.assert_not_called()
+
+
+def test_sql_da_ia_roda_na_conexao_de_consulta_e_nao_na_principal(
+    client, db_session_factory, logar_usuario, monkeypatch
+):
+    """O SELECT gerado precisa passar por SessionConsulta (usuário só-SELECT
+    em produção); a conexão principal só grava o LogAuditoria."""
+    from unittest.mock import MagicMock
+
+    session = db_session_factory()
+    usuario = _criar_usuario(session)
+    caso = ClienteCaso(nome_cliente="Caso")
+    session.add(caso)
+    session.commit()
+    session.close()
+    logar_usuario(usuario)
+
+    sessoes_consulta = []
+
+    def fabrica_consulta():
+        s = db_session_factory()
+        sessoes_consulta.append(s)
+        return s
+
+    monkeypatch.setattr("app.api.routes_consulta.SessionConsulta", fabrica_consulta)
+    monkeypatch.setattr(
+        "app.api.routes_consulta.gerar_plano_consulta",
+        MagicMock(
+            return_value=PlanoConsulta(
+                consultas=[
+                    ConsultaPlanejada(
+                        finalidade="listagem",
+                        sql=(
+                            "SELECT n.id AS nota_id FROM notas n WHERE "
+                            "n.cliente_caso_id = :cliente_caso_id AND n.situacao = 'autorizada'"
+                        ),
+                    )
+                ],
+                resposta_modelo=None,
+            )
+        ),
+    )
+
+    resp = client.post("/api/consulta", json={"pergunta": "liste as notas", "cliente_caso_id": caso.id})
+
+    assert resp.status_code == 200
+    assert len(sessoes_consulta) == 1

@@ -1,11 +1,12 @@
 import html
 from datetime import datetime
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from app.core.auth import auth_backend, cookie_backend, fastapi_users
+from app.core import limite_taxa
 from app.core.database import SessionLocal
 from app.core.tokens import TokenExpirado, TokenInvalido, verificar_token_aprovacao
 from app.models.models import LogAuditoria, StatusCadastro, Usuario
@@ -14,14 +15,33 @@ from app.workers.tasks import enviar_notificacao_resultado_cadastro
 
 router = APIRouter()
 
-router.include_router(fastapi_users.get_auth_router(auth_backend), prefix="/jwt")
+# Limite de tentativas (app/core/limite_taxa.py) entra como dependência do
+# include_router -- é o jeito de somar uma checagem às rotas do fastapi-users
+# sem mexer na biblioteca. As dependências de login só contam /login (o
+# mesmo router traz /logout), e as de senha só /forgot-password.
+_LIMITES_LOGIN = [Depends(limite_taxa.login_por_email), Depends(limite_taxa.login_por_ip)]
+
+router.include_router(
+    fastapi_users.get_auth_router(auth_backend), prefix="/jwt", dependencies=_LIMITES_LOGIN
+)
 # Cookie HttpOnly -- usado pelo frontend React (web/), que roda atrás do
 # proxy do Vite na mesma origem da API. O Streamlit e os testes continuam em
 # /jwt (Bearer).
-router.include_router(fastapi_users.get_auth_router(cookie_backend), prefix="/cookie")
-router.include_router(fastapi_users.get_register_router(UsuarioRead, UsuarioCreate))
+router.include_router(
+    fastapi_users.get_auth_router(cookie_backend), prefix="/cookie", dependencies=_LIMITES_LOGIN
+)
+router.include_router(
+    fastapi_users.get_register_router(UsuarioRead, UsuarioCreate),
+    dependencies=[Depends(limite_taxa.cadastro_por_ip)],
+)
 router.include_router(fastapi_users.get_users_router(UsuarioRead, UsuarioUpdate), prefix="/users")
-router.include_router(fastapi_users.get_reset_password_router())
+router.include_router(
+    fastapi_users.get_reset_password_router(),
+    dependencies=[
+        Depends(limite_taxa.esqueci_senha_por_email),
+        Depends(limite_taxa.esqueci_senha_por_ip),
+    ],
+)
 
 
 def _pagina(titulo: str, mensagem: str) -> HTMLResponse:
