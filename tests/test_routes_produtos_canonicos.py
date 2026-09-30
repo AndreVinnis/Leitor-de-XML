@@ -732,3 +732,72 @@ def test_transferir_canonico_sem_autenticacao_retorna_401(client, db_session_fac
         json={"destino_id": 2},
     )
     assert resp.status_code == 401
+
+
+def test_listar_canonicos_filtra_sem_categoria(client, db_session_factory, logar_usuario):
+    session = db_session_factory()
+    usuario = _criar_usuario(session)
+    caso = _criar_caso(session)
+    session.add_all(
+        [
+            ProdutoCanonico(cliente_caso_id=caso.id, nome_canonico="Com Cat", categoria="Bebidas"),
+            ProdutoCanonico(cliente_caso_id=caso.id, nome_canonico="Sem Cat Nulo", categoria=None),
+            ProdutoCanonico(cliente_caso_id=caso.id, nome_canonico="Sem Cat Vazio", categoria=""),
+        ]
+    )
+    session.commit()
+    session.close()
+    logar_usuario(usuario)
+
+    resp = client.get(f"/api/produtos/canonicos?cliente_caso_id={caso.id}&sem_categoria=true")
+
+    assert resp.status_code == 200
+    corpo = resp.json()
+    assert corpo["total"] == 2
+    assert sorted(i["nome_canonico"] for i in corpo["itens"]) == ["Sem Cat Nulo", "Sem Cat Vazio"]
+
+
+def test_listar_canonicos_limit_acima_do_maximo_retorna_422(
+    client, db_session_factory, logar_usuario
+):
+    session = db_session_factory()
+    usuario = _criar_usuario(session)
+    caso = _criar_caso(session)
+    session.close()
+    logar_usuario(usuario)
+
+    resp = client.get(f"/api/produtos/canonicos?cliente_caso_id={caso.id}&limit=500")
+    assert resp.status_code == 422
+
+
+def test_listar_categorias_devolve_distintas_ordenadas_sem_nulos_e_sem_vazar_entre_casos(
+    client, db_session_factory, logar_usuario
+):
+    session = db_session_factory()
+    usuario = _criar_usuario(session)
+    caso = _criar_caso(session)
+    outro_caso = _criar_caso(session, "Outro Cliente")
+    session.add_all(
+        [
+            ProdutoCanonico(cliente_caso_id=caso.id, nome_canonico="A", categoria="Bebidas"),
+            ProdutoCanonico(cliente_caso_id=caso.id, nome_canonico="B", categoria="Bebidas"),
+            ProdutoCanonico(cliente_caso_id=caso.id, nome_canonico="C", categoria="Alimentos"),
+            ProdutoCanonico(cliente_caso_id=caso.id, nome_canonico="D", categoria=None),
+            ProdutoCanonico(cliente_caso_id=caso.id, nome_canonico="E", categoria=""),
+            ProdutoCanonico(cliente_caso_id=outro_caso.id, nome_canonico="F", categoria="Limpeza"),
+        ]
+    )
+    session.commit()
+    session.close()
+    logar_usuario(usuario)
+
+    resp = client.get(f"/api/produtos/canonicos/categorias?cliente_caso_id={caso.id}")
+
+    assert resp.status_code == 200
+    assert resp.json() == {"categorias": ["Alimentos", "Bebidas"]}
+
+
+def test_listar_categorias_sem_autenticacao_retorna_401(client, db_session_factory):
+    db_session_factory()
+    resp = client.get("/api/produtos/canonicos/categorias?cliente_caso_id=1")
+    assert resp.status_code == 401

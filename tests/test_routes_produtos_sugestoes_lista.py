@@ -321,3 +321,40 @@ def test_listar_canonicos_sem_autenticacao_retorna_401(client, db_session_factor
     db_session_factory()
     resp = client.get("/api/produtos/canonicos?cliente_caso_id=1")
     assert resp.status_code == 401
+
+
+def test_listar_sugestoes_devolve_canonico_vinculado_nulo_na_pendente_e_preenchido_apos_corrigir(
+    client, db_session_factory, logar_usuario
+):
+    session = db_session_factory()
+    usuario = _criar_usuario(session)
+    caso = _criar_caso(session)
+    sugestao, item, canonico, nota = _criar_sugestao(
+        session, caso.id, "9" * 44, "COCA COLA 350ML LT", "Coca-Cola Lata 350ml", categoria="Bebidas"
+    )
+    escolhido = ProdutoCanonico(cliente_caso_id=caso.id, nome_canonico="Refrigerante Cola")
+    session.add(escolhido)
+    session.commit()
+    session.refresh(escolhido)
+    session.close()
+    logar_usuario(usuario)
+
+    resp = client.get(f"/api/produtos/sugestoes?cliente_caso_id={caso.id}")
+    (item_resp,) = resp.json()["itens"]
+    assert item_resp["produto_canonico_vinculado_id"] is None
+    assert item_resp["nome_canonico_vinculado"] is None
+
+    client.post(
+        f"/api/produtos/sugestoes/{sugestao.id}/corrigir",
+        json={"produto_canonico_id": escolhido.id},
+    )
+
+    resp = client.get(f"/api/produtos/sugestoes?cliente_caso_id={caso.id}&status=todos")
+    corpo = resp.json()
+    assert corpo["total"] == 1
+    (item_resp,) = corpo["itens"]
+    assert item_resp["produto_canonico_vinculado_id"] == escolhido.id
+    assert item_resp["nome_canonico_vinculado"] == "Refrigerante Cola"
+    # o canônico sugerido pela IA continua sendo o das colunas originais
+    assert item_resp["nome_canonico"] == "Coca-Cola Lata 350ml"
+    assert item_resp["produto_canonico_sugerido_id"] == canonico.id
