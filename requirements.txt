@@ -1,4 +1,8 @@
-fastapi==0.115.0
+# fastapi 0.115.14 aceita starlette >=0.40 (CVE-2024-47874, DoS no parser de
+# multipart, corrigido na 0.40.0); starlette pinado explicitamente para o
+# upgrade não depender do resolvedor.
+fastapi==0.115.14
+starlette==0.46.2
 uvicorn[standard]==0.30.6
 sqlalchemy[asyncio]==2.0.35
 pymysql==1.1.1
@@ -13,12 +17,17 @@ pydantic-settings==2.5.2
 # Já vem transitivo via fastapi-users[sqlalchemy] (EmailStr), mas pinado
 # porque app/schemas/usuario.py importa direto para liberar a TLD ".local".
 email-validator==2.1.2
-python-multipart==0.0.9
-fastapi-users[sqlalchemy]==13.0.0
+# >=0.0.18 corrige o CVE-2024-53981 (DoS por lixo antes do boundary); a faixa
+# >=0.0.22 é a que o fastapi-users 15.0.5 exige.
+python-multipart==0.0.32
+# 13.0.0 fixava python-multipart==0.0.9 e travava a correção acima.
+fastapi-users[sqlalchemy]==15.0.5
 itsdangerous==2.2.0
 google-genai==2.21.0
 anthropic==1.8.0
 tenacity==9.1.4
+# Parser SQL do validador do NL->SQL (app/core/sql_seguranca.py).
+sqlglot==30.20.0
 numpy==2.1.3
 # DANFE (PDF) gerado a partir do XML da nota -- app/relatorios/danfe.py.
 brazilfiscalreport==1.1.1
