@@ -73,7 +73,8 @@ interface ParametrosListarCanonicos {
   clienteCasoId: number;
   categoria?: string;
   busca?: string;
-  limit?: number;
+  semCategoria?: boolean;
+  limit?: number; // máximo 200 no backend (acima disso, HTTP 422)
   offset?: number;
 }
 
@@ -81,9 +82,17 @@ export function listarCanonicos(params: ParametrosListarCanonicos): Promise<List
   const query = new URLSearchParams({ cliente_caso_id: String(params.clienteCasoId) });
   if (params.categoria) query.set("categoria", params.categoria);
   if (params.busca) query.set("busca", params.busca);
+  if (params.semCategoria) query.set("sem_categoria", "true");
   query.set("limit", String(params.limit ?? 50));
   query.set("offset", String(params.offset ?? 0));
   return get<ListaCanonicos>(`/api/produtos/canonicos?${query.toString()}`);
+}
+
+export async function listarCategoriasCanonicos(clienteCasoId: number): Promise<string[]> {
+  const resposta = await get<{ categorias: string[] }>(
+    `/api/produtos/canonicos/categorias?cliente_caso_id=${clienteCasoId}`
+  );
+  return resposta.categorias;
 }
 
 export function criarCanonico(
@@ -144,7 +153,7 @@ export function listarItensVinculados(
 /**
  * Reatribui manualmente um item já vinculado a outro produto canônico --
  * ação de edição na tela "Itens Vinculados", diferente de corrigirSugestao
- * (que só vale enquanto a sugestão de origem ainda está pendente).
+ * (que atua sobre a sugestão de normalização).
  */
 export function reatribuirItem(
   itemNotaId: number,

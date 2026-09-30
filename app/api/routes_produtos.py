@@ -1,9 +1,9 @@
 from datetime import date, datetime
 from uuid import uuid4
 
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy import func, or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from app.ai.embeddings import gerar_embeddings, serializar_embedding
 from app.core import trava_normalizacao
@@ -118,14 +118,16 @@ async def listar_canonicos(
     cliente_caso_id: int,
     categoria: str | None = None,
     busca: str | None = None,
-    limit: int = 50,
-    offset: int = 0,
+    sem_categoria: bool = False,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     usuario: Usuario = Depends(usuario_atual_ativo),
 ):
     """
     Lista os produtos canônicos de um caso, com a contagem de itens de nota
     já vinculados a cada um (tela "Produtos Canônicos"). `categoria`/`busca`
-    filtram por igualdade/ilike; devolve o mesmo envelope {"itens", "total"}
+    filtram por igualdade/ilike; `sem_categoria=true` traz só os canônicos
+    sem categoria (NULL ou vazia); devolve o mesmo envelope {"itens", "total"}
     de /sugestoes e /api/notas, paginável via `limit`/`offset`.
     """
     db: Session = SessionLocal()
@@ -153,6 +155,10 @@ async def listar_canonicos(
 
         if categoria is not None:
             query = query.filter(ProdutoCanonico.categoria == categoria)
+        if sem_categoria:
+            query = query.filter(
+                or_(ProdutoCanonico.categoria.is_(None), ProdutoCanonico.categoria == "")
+            )
         if busca is not None:
             query = query.filter(ProdutoCanonico.nome_canonico.ilike(f"%{busca}%"))
 
@@ -171,6 +177,33 @@ async def listar_canonicos(
             for canonico, total_itens in resultados
         ]
         return {"itens": itens, "total": total}
+    finally:
+        db.close()
+
+
+@router.get("/canonicos/categorias")
+async def listar_categorias_canonicos(
+    cliente_caso_id: int,
+    usuario: Usuario = Depends(usuario_atual_ativo),
+):
+    """
+    Categorias distintas (não nulas e não vazias, em ordem alfabética) dos
+    produtos canônicos de um caso -- alimenta o filtro de categoria da tela.
+    """
+    db: Session = SessionLocal()
+    try:
+        linhas = (
+            db.query(ProdutoCanonico.categoria)
+            .filter(
+                ProdutoCanonico.cliente_caso_id == cliente_caso_id,
+                ProdutoCanonico.categoria.is_not(None),
+                ProdutoCanonico.categoria != "",
+            )
+            .distinct()
+            .order_by(ProdutoCanonico.categoria)
+            .all()
+        )
+        return {"categorias": [categoria for (categoria,) in linhas]}
     finally:
         db.close()
 
@@ -268,8 +301,9 @@ async def reatribuir_item(
     Reatribui manualmente um item de nota já vinculado a outro produto
     canônico -- ação de edição na tela "Itens Vinculados ao Produto
     Canônico", para corrigir um vínculo depois que ele já foi confirmado
-    (diferente de POST /sugestoes/{id}/corrigir, que só se aplica enquanto a
-    sugestão ainda está pendente). Puramente determinístico, sem IA.
+    (diferente de POST /sugestoes/{id}/corrigir, que parte de uma sugestão
+    de normalização e mantém o vínculo dela com a sugestão da IA).
+    Puramente determinístico, sem IA.
     """
     db: Session = SessionLocal()
     try:
@@ -529,17 +563,22 @@ async def listar_sugestoes(
     Lista sugestões de normalização (join com o item, a nota e o canônico
     sugerido) de um caso, para revisão humana. `status="todos"` remove o
     filtro por status; qualquer outro valor precisa bater com StatusRevisao.
+    Categoria/busca valem sobre o canônico SUGERIDO; o canônico atualmente
+    vinculado ao item (pode diferir após uma correção) vai em
+    `produto_canonico_vinculado_id`/`nome_canonico_vinculado`.
     """
     db: Session = SessionLocal()
     try:
+        canonico_vinculado = aliased(ProdutoCanonico)
         query = (
-            db.query(SugestaoNormalizacao, ItemNota, Nota, ProdutoCanonico)
+            db.query(SugestaoNormalizacao, ItemNota, Nota, ProdutoCanonico, canonico_vinculado)
             .join(ItemNota, ItemNota.id == SugestaoNormalizacao.item_nota_id)
             .join(Nota, Nota.id == ItemNota.nota_id)
             .join(
                 ProdutoCanonico,
                 ProdutoCanonico.id == SugestaoNormalizacao.produto_canonico_sugerido_id,
             )
+            .outerjoin(canonico_vinculado, canonico_vinculado.id == ItemNota.produto_canonico_id)
             .filter(Nota.cliente_caso_id == cliente_caso_id)
         )
 
@@ -579,13 +618,17 @@ async def listar_sugestoes(
                 "produto_canonico_sugerido_id": sugestao.produto_canonico_sugerido_id,
                 "nome_canonico": canonico.nome_canonico,
                 "categoria": canonico.categoria,
+                "produto_canonico_vinculado_id": item.produto_canonico_id,
+                "nome_canonico_vinculado": (
+                    vinculado.nome_canonico if vinculado is not None else None
+                ),
                 "fornecedor": nota.emitente_nome,
                 "situacao_nota": nota.situacao.value if nota.situacao is not None else None,
                 "confianca": float(sugestao.confianca),
                 "status": sugestao.status.value,
                 "criado_em": sugestao.criado_em,
             }
-            for sugestao, item, nota, canonico in resultados
+            for sugestao, item, nota, canonico, vinculado in resultados
         ]
         return {"itens": itens, "total": total}
     finally:
@@ -608,23 +651,31 @@ def _revisar(
 
     `produto_canonico_override_id`: usado só pelo fluxo de "corrigir"
     (escolher outro canônico que não o sugerido pela IA). Quando presente,
-    exige que a sugestão ainda esteja PENDENTE (corrigir só faz sentido
-    antes de uma decisão já tomada) e NÃO altera
-    produto_canonico_sugerido_id -- só o produto_canonico_id do item, para
-    preservar o que a IA sugeriu originalmente.
+    vale para sugestão em qualquer status (PENDENTE, REJEITADO ou
+    CONFIRMADO: uma sugestão rejeitada não volta para a fila da IA, então
+    precisa poder ser corrigida) e NÃO altera produto_canonico_sugerido_id
+    -- só o produto_canonico_id do item, para preservar o que a IA sugeriu
+    originalmente.
+
+    Sem `produto_canonico_override_id` (confirmar/rejeitar simples), só age
+    sobre sugestão PENDENTE: nas demais devolve erro sem alterar nada. Assim
+    um confirmar em lote não sobrescreve uma correção humana com o canônico
+    da IA, e um rejeitar não deixa o item vinculado com sugestão rejeitada.
     """
     sugestao = db.get(SugestaoNormalizacao, sugestao_id)
     if sugestao is None:
         return {"status": "erro", "motivo": "sugestão não encontrada"}
 
-    if produto_canonico_override_id is not None and sugestao.status != StatusRevisao.PENDENTE:
+    if produto_canonico_override_id is None and sugestao.status != StatusRevisao.PENDENTE:
         return {"status": "erro", "motivo": "sugestão não está pendente"}
 
+    status_anterior = sugestao.status
     sugestao.status = StatusRevisao.CONFIRMADO if confirmado else StatusRevisao.REJEITADO
     sugestao.revisado_por_usuario_id = usuario_id
     sugestao.revisado_em = datetime.utcnow()
 
     item = db.get(ItemNota, sugestao.item_nota_id)
+    canonico_anterior = item.produto_canonico_id
 
     if confirmado:
         produto_id = (
@@ -636,8 +687,9 @@ def _revisar(
         if produto_canonico_override_id is not None:
             acao = "correcao_sugestao_normalizacao"
             resumo = (
-                f"Sugestão {sugestao_id} corrigida: IA sugeriu produto canônico "
-                f"{sugestao.produto_canonico_sugerido_id}, usuário escolheu {produto_id}"
+                f"Sugestão {sugestao_id} ({status_anterior.value}) corrigida: "
+                f"IA sugeriu produto canônico {sugestao.produto_canonico_sugerido_id}, "
+                f"item estava em {canonico_anterior}, usuário escolheu {produto_id}"
             )
         else:
             acao = "confirmacao_sugestao_normalizacao"
@@ -717,8 +769,9 @@ async def corrigir_sugestao(
     usuario: Usuario = Depends(usuario_atual_ativo),
 ):
     """
-    Escolhe, para uma sugestão pendente, um produto canônico diferente do
-    sugerido pela IA (existente ou recém-criado via POST /canonicos). O
+    Escolhe, para uma sugestão, um produto canônico diferente do sugerido
+    pela IA (existente ou recém-criado via POST /canonicos). Vale para
+    sugestão pendente, rejeitada ou já confirmada. O
     produto_canonico_sugerido_id da sugestão não muda -- só o
     produto_canonico_id do item passa a apontar para a escolha do usuário.
     """

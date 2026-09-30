@@ -193,9 +193,7 @@ def test_corrigir_sugestao_com_canonico_de_outro_caso_retorna_400(
     session.close()
 
 
-def test_corrigir_sugestao_ja_nao_pendente_retorna_erro_no_corpo(
-    client, db_session_factory, logar_usuario
-):
+def test_corrigir_sugestao_ja_aprovada_funciona(client, db_session_factory, logar_usuario):
     session = db_session_factory()
     usuario = _criar_usuario(session)
     sugestao, item = _montar_sugestao_pendente(session, "6" * 44)
@@ -204,6 +202,7 @@ def test_corrigir_sugestao_ja_nao_pendente_retorna_erro_no_corpo(
     session.add(outro_canonico)
     session.commit()
     session.refresh(outro_canonico)
+    produto_sugerido_original_id = sugestao.produto_canonico_sugerido_id
     session.close()
     logar_usuario(usuario)
 
@@ -216,11 +215,51 @@ def test_corrigir_sugestao_ja_nao_pendente_retorna_erro_no_corpo(
     )
 
     assert resp.status_code == 200
-    assert resp.json()["status"] == "erro"
+    assert resp.json() == {"status": "ok", "sugestao_id": sugestao.id}
 
     session = db_session_factory()
-    item_inalterado = session.get(ItemNota, item.id)
-    assert item_inalterado.produto_canonico_id == sugestao.produto_canonico_sugerido_id
+    item_atualizado = session.get(ItemNota, item.id)
+    sugestao_atualizada = session.get(SugestaoNormalizacao, sugestao.id)
+    assert item_atualizado.produto_canonico_id == outro_canonico.id
+    assert sugestao_atualizada.produto_canonico_sugerido_id == produto_sugerido_original_id
+    assert sugestao_atualizada.status == StatusRevisao.CONFIRMADO
+    session.close()
+
+
+def test_corrigir_sugestao_rejeitada_confirma_com_canonico_escolhido(
+    client, db_session_factory, logar_usuario
+):
+    session = db_session_factory()
+    usuario = _criar_usuario(session)
+    sugestao, item = _montar_sugestao_pendente(session, "8" * 44)
+    caso_id = session.get(Nota, item.nota_id).cliente_caso_id
+    outro_canonico = ProdutoCanonico(cliente_caso_id=caso_id, nome_canonico="Item V")
+    session.add(outro_canonico)
+    session.commit()
+    session.refresh(outro_canonico)
+    produto_sugerido_original_id = sugestao.produto_canonico_sugerido_id
+    session.close()
+    logar_usuario(usuario)
+
+    client.post(f"/api/produtos/sugestoes/{sugestao.id}/rejeitar")
+
+    resp = client.post(
+        f"/api/produtos/sugestoes/{sugestao.id}/corrigir",
+        json={"produto_canonico_id": outro_canonico.id},
+    )
+
+    assert resp.status_code == 200
+    assert resp.json() == {"status": "ok", "sugestao_id": sugestao.id}
+
+    session = db_session_factory()
+    item_atualizado = session.get(ItemNota, item.id)
+    sugestao_atualizada = session.get(SugestaoNormalizacao, sugestao.id)
+    assert item_atualizado.produto_canonico_id == outro_canonico.id
+    assert sugestao_atualizada.produto_canonico_sugerido_id == produto_sugerido_original_id
+    assert sugestao_atualizada.status == StatusRevisao.CONFIRMADO
+
+    log = session.query(LogAuditoria).filter_by(acao="correcao_sugestao_normalizacao").one()
+    assert "rejeitado" in log.resultado_resumo
     session.close()
 
 
@@ -234,3 +273,89 @@ def test_corrigir_sugestao_sem_autenticacao_retorna_401(client, db_session_facto
         json={"produto_canonico_id": 1},
     )
     assert resp.status_code == 401
+
+
+def _criar_canonico_no_caso(session, item, nome):
+    caso_id = session.get(Nota, item.nota_id).cliente_caso_id
+    canonico = ProdutoCanonico(cliente_caso_id=caso_id, nome_canonico=nome)
+    session.add(canonico)
+    session.commit()
+    session.refresh(canonico)
+    return canonico
+
+
+def test_confirmar_sugestao_ja_corrigida_devolve_erro_e_preserva_escolha_humana(
+    client, db_session_factory, logar_usuario
+):
+    session = db_session_factory()
+    usuario = _criar_usuario(session)
+    sugestao, item = _montar_sugestao_pendente(session, "9" * 44)
+    escolhido = _criar_canonico_no_caso(session, item, "Item Escolhido")
+    session.close()
+    logar_usuario(usuario)
+
+    client.post(
+        f"/api/produtos/sugestoes/{sugestao.id}/corrigir",
+        json={"produto_canonico_id": escolhido.id},
+    )
+    resp = client.post(f"/api/produtos/sugestoes/{sugestao.id}/confirmar")
+
+    assert resp.status_code == 200
+    assert resp.json() == {"status": "erro", "motivo": "sugestão não está pendente"}
+
+    session = db_session_factory()
+    assert session.get(ItemNota, item.id).produto_canonico_id == escolhido.id
+    assert session.query(LogAuditoria).filter_by(acao="confirmacao_sugestao_normalizacao").count() == 0
+    session.close()
+
+
+def test_rejeitar_sugestao_ja_aprovada_devolve_erro_e_nao_altera_nada(
+    client, db_session_factory, logar_usuario
+):
+    session = db_session_factory()
+    usuario = _criar_usuario(session)
+    sugestao, item = _montar_sugestao_pendente(session, "a" * 44)
+    session.close()
+    logar_usuario(usuario)
+
+    client.post(f"/api/produtos/sugestoes/{sugestao.id}/confirmar")
+    resp = client.post(f"/api/produtos/sugestoes/{sugestao.id}/rejeitar")
+
+    assert resp.json() == {"status": "erro", "motivo": "sugestão não está pendente"}
+
+    session = db_session_factory()
+    assert session.get(SugestaoNormalizacao, sugestao.id).status == StatusRevisao.CONFIRMADO
+    assert session.get(ItemNota, item.id).produto_canonico_id == sugestao.produto_canonico_sugerido_id
+    assert session.query(LogAuditoria).filter_by(acao="rejeicao_sugestao_normalizacao").count() == 0
+    session.close()
+
+
+def test_lote_com_mistura_processa_so_pendentes_e_devolve_erro_nas_demais(
+    client, db_session_factory, logar_usuario
+):
+    session = db_session_factory()
+    usuario = _criar_usuario(session)
+    pendente, item_pendente = _montar_sugestao_pendente(session, "b" * 44)
+    corrigida, item_corrigido = _montar_sugestao_pendente(session, "c" * 44)
+    escolhido = _criar_canonico_no_caso(session, item_corrigido, "Item Humano")
+    session.close()
+    logar_usuario(usuario)
+
+    client.post(
+        f"/api/produtos/sugestoes/{corrigida.id}/corrigir",
+        json={"produto_canonico_id": escolhido.id},
+    )
+    resp = client.post(
+        "/api/produtos/sugestoes/lote/confirmar",
+        json={"ids": [pendente.id, corrigida.id]},
+    )
+
+    assert resp.json()["resultados"] == [
+        {"status": "ok", "sugestao_id": pendente.id},
+        {"status": "erro", "motivo": "sugestão não está pendente"},
+    ]
+
+    session = db_session_factory()
+    assert session.get(ItemNota, item_pendente.id).produto_canonico_id == pendente.produto_canonico_sugerido_id
+    assert session.get(ItemNota, item_corrigido.id).produto_canonico_id == escolhido.id
+    session.close()

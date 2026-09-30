@@ -228,13 +228,22 @@ def listar_canonicos(cliente_caso_id: int) -> list:
     só precisam da lista completa para popular selectbox/filtro -- o
     unwrap fica aqui para não mexer em cada chamador.
     """
-    resposta = requests.get(
-        f"{BASE_URL}/api/produtos/canonicos",
-        params={"cliente_caso_id": cliente_caso_id, "limit": 1000},
-        headers=_cabecalhos(),
-        timeout=TIMEOUT_PADRAO,
-    )
-    return _tratar_resposta(resposta)["itens"]
+    # A rota limita "limit" a 200 (acima disso, 422): pagina até esgotar o total.
+    limite = 200
+    itens: list = []
+    offset = 0
+    while True:
+        resposta = requests.get(
+            f"{BASE_URL}/api/produtos/canonicos",
+            params={"cliente_caso_id": cliente_caso_id, "limit": limite, "offset": offset},
+            headers=_cabecalhos(),
+            timeout=TIMEOUT_PADRAO,
+        )
+        pagina = _tratar_resposta(resposta)
+        itens.extend(pagina["itens"])
+        offset += limite
+        if not pagina["itens"] or offset >= pagina["total"]:
+            return itens
 
 
 def criar_canonico(cliente_caso_id: int, nome_canonico: str, categoria: str | None = None) -> dict:

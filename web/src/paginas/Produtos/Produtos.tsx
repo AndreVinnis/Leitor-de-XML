@@ -5,7 +5,6 @@ import {
   confirmarSugestao,
   confirmarSugestoesLote,
   corrigirSugestao,
-  criarCanonico,
   dispararNormalizacao,
   editarCanonico,
   listarCanonicos,
@@ -16,6 +15,7 @@ import {
   statusNormalizacao,
   transferirCanonico,
 } from "../../api/produtos";
+import { useCategoriasDoCaso } from "../../api/useCategoriasDoCaso";
 import { ErroApi } from "../../api/cliente";
 import type { ProdutoCanonico, ResultadoRevisao, StatusRevisao, SugestaoNormalizacao } from "../../api/tipos";
 import { Badge, type StatusBadge } from "../../componentes/Badge";
@@ -24,6 +24,7 @@ import { CampoTexto } from "../../componentes/CampoTexto";
 import { Card } from "../../componentes/Card";
 import { Modal } from "../../componentes/Modal";
 import { Paginacao } from "../../componentes/Paginacao";
+import { SeletorProdutoCanonico } from "../../componentes/SeletorProdutoCanonico/SeletorProdutoCanonico";
 import { SeletorCategoria } from "../../componentes/SeletorCategoria";
 import { Tabela, type ColunaTabela } from "../../componentes/Tabela";
 import { useToast } from "../../componentes/Toast";
@@ -171,7 +172,8 @@ export function Produtos() {
 
     // Invalida também nas falhas: os lotes anteriores já foram salvos.
     queryClient.invalidateQueries({ queryKey: ["sugestoes", casoIdNumero] });
-    queryClient.invalidateQueries({ queryKey: ["canonicos-todos", casoIdNumero] });
+    queryClient.invalidateQueries({ queryKey: ["canonicos-categorias", casoIdNumero] });
+    queryClient.invalidateQueries({ queryKey: ["canonicos-busca", casoIdNumero] });
     queryClient.invalidateQueries({ queryKey: ["canonicos-tabela", casoIdNumero] });
     // Sem isso, voltar a esta tela serviria do cache o task_id já terminado
     // e o toast de conclusão apareceria de novo.
@@ -239,14 +241,6 @@ function traduzirResultadoUnitario(resultado: ResultadoRevisao, mensagemSucesso:
   return [true, mensagemSucesso];
 }
 
-function useCanonicosDoCaso(casoIdNumero: number) {
-  return useQuery({
-    queryKey: ["canonicos-todos", casoIdNumero],
-    queryFn: () => listarCanonicos({ clienteCasoId: casoIdNumero, limit: 500 }),
-    enabled: Number.isFinite(casoIdNumero),
-  });
-}
-
 function AbaSugestoes() {
   const { casoId } = useParams<{ casoId: string }>();
   const casoIdNumero = Number(casoId);
@@ -267,11 +261,7 @@ function AbaSugestoes() {
     return () => clearTimeout(temporizador);
   }, [buscaDigitada]);
 
-  const canonicos = useCanonicosDoCaso(casoIdNumero);
-  const categorias = useMemo(
-    () => Array.from(new Set((canonicos.data?.itens ?? []).map((c) => c.categoria).filter(Boolean))) as string[],
-    [canonicos.data]
-  );
+  const categorias = useCategoriasDoCaso(casoIdNumero).data ?? [];
 
   const sugestoes = useQuery({
     queryKey: ["sugestoes", casoIdNumero, statusFiltro, categoriaFiltro, fornecedorFiltro, busca, offset],
@@ -312,7 +302,31 @@ function AbaSugestoes() {
 
   async function invalidarSugestoes() {
     await queryClient.invalidateQueries({ queryKey: ["sugestoes", casoIdNumero] });
-    await queryClient.invalidateQueries({ queryKey: ["canonicos-todos", casoIdNumero] });
+    await queryClient.invalidateQueries({ queryKey: ["canonicos-categorias", casoIdNumero] });
+    await queryClient.invalidateQueries({ queryKey: ["canonicos-busca", casoIdNumero] });
+    await queryClient.invalidateQueries({ queryKey: ["canonicos-tabela", casoIdNumero] });
+  }
+
+  function removerDaSelecao(id: number) {
+    setSelecionados((atual) => {
+      if (!atual.has(id)) return atual;
+      const novo = new Set(atual);
+      novo.delete(id);
+      return novo;
+    });
+  }
+
+  /**
+   * Se as `quantidade` linhas que saem da lista eram todas as desta página
+   * (a última, com offset > 0), volta uma página: senão a tabela ficaria vazia,
+   * além do total. Só vale quando o filtro de status faz a linha sair da lista.
+   */
+  function voltarPaginaSeEsvaziou(quantidade: number, novoStatus: StatusRevisao) {
+    const saiuDaLista = statusFiltro !== "todos" && statusFiltro !== novoStatus;
+    const naPagina = sugestoes.data?.itens.length ?? 0;
+    if (saiuDaLista && offset > 0 && quantidade >= naPagina) {
+      setOffset(Math.max(0, offset - LIMITE_SUGESTOES));
+    }
   }
 
   async function confirmarUnitario(sugestaoId: number) {
@@ -320,6 +334,8 @@ function AbaSugestoes() {
       const resultado = await confirmarSugestao(sugestaoId);
       const [ok, mensagem] = traduzirResultadoUnitario(resultado, "Sugestão aprovada com sucesso.");
       notificar(mensagem, ok ? "sucesso" : "erro");
+      removerDaSelecao(sugestaoId);
+      if (ok) voltarPaginaSeEsvaziou(1, "confirmado");
       await invalidarSugestoes();
     } catch (excecao) {
       notificar(excecao instanceof ErroApi ? excecao.message : "Erro de comunicação com a API.", "erro");
@@ -331,6 +347,8 @@ function AbaSugestoes() {
       const resultado = await rejeitarSugestao(sugestaoId);
       const [ok, mensagem] = traduzirResultadoUnitario(resultado, "Sugestão rejeitada com sucesso.");
       notificar(mensagem, ok ? "sucesso" : "erro");
+      removerDaSelecao(sugestaoId);
+      if (ok) voltarPaginaSeEsvaziou(1, "rejeitado");
       await invalidarSugestoes();
     } catch (excecao) {
       notificar(excecao instanceof ErroApi ? excecao.message : "Erro de comunicação com a API.", "erro");
@@ -338,8 +356,13 @@ function AbaSugestoes() {
   }
 
   async function executarLote(acao: "confirmar" | "rejeitar") {
-    const ids = Array.from(selecionados);
-    if (ids.length === 0) return;
+    // Só ids ainda pendentes nesta página: a seleção pode ter ficado obsoleta.
+    const pendentes = new Set(idsPendentesPagina);
+    const ids = Array.from(selecionados).filter((id) => pendentes.has(id));
+    if (ids.length === 0) {
+      setSelecionados(new Set());
+      return;
+    }
     try {
       const resultado = await (acao === "confirmar" ? confirmarSugestoesLote(ids) : rejeitarSugestoesLote(ids));
       const falhas = resultado.resultados.filter((r) => r.status === "erro");
@@ -354,6 +377,7 @@ function AbaSugestoes() {
         notificar(`Sugestão ${falha.sugestao_id ?? "?"}: ${falha.motivo ?? "motivo desconhecido"}`, "erro")
       );
       setSelecionados(new Set());
+      if (sucesso) voltarPaginaSeEsvaziou(sucesso, acao === "confirmar" ? "confirmado" : "rejeitado");
       await invalidarSugestoes();
     } catch (excecao) {
       notificar(excecao instanceof ErroApi ? excecao.message : "Erro de comunicação com a API.", "erro");
@@ -383,7 +407,14 @@ function AbaSugestoes() {
     {
       chave: "nome_canonico",
       titulo: "Sugestão da IA",
-      renderizar: (sugestao) => <span className={estilos.pilula}>{sugestao.nome_canonico}</span>,
+      renderizar: (sugestao) => (
+        <>
+          <span className={estilos.pilula}>{sugestao.nome_canonico}</span>
+          {sugestao.nome_canonico_vinculado && sugestao.nome_canonico_vinculado !== sugestao.nome_canonico && (
+            <div className={estilos.textoVinculado}>Vinculado: {sugestao.nome_canonico_vinculado}</div>
+          )}
+        </>
+      ),
     },
     {
       chave: "categoria",
@@ -402,13 +433,23 @@ function AbaSugestoes() {
       chave: "acoes",
       titulo: "Ações",
       renderizar: (sugestao) => {
-        const jaRevisada = sugestao.status !== "pendente";
+        if (sugestao.status !== "pendente") {
+          return (
+            <button
+              type="button"
+              className={estilos.acaoEscolher}
+              title="Escolher outro produto canônico"
+              onClick={() => setCorrigindo(sugestao)}
+            >
+              ✎ Escolher produto
+            </button>
+          );
+        }
         return (
           <div className={estilos.acoes}>
             <button
               type="button"
               className={estilos.acaoSucesso}
-              disabled={jaRevisada}
               title="Aprovar sugestão"
               onClick={() => confirmarUnitario(sugestao.id)}
             >
@@ -417,7 +458,6 @@ function AbaSugestoes() {
             <button
               type="button"
               className={estilos.acaoErro}
-              disabled={jaRevisada}
               title="Rejeitar sugestão"
               onClick={() => rejeitarUnitario(sugestao.id)}
             >
@@ -426,7 +466,6 @@ function AbaSugestoes() {
             <button
               type="button"
               className={estilos.acaoNeutra}
-              disabled={jaRevisada}
               title="Escolher outro produto canônico"
               onClick={() => setCorrigindo(sugestao)}
             >
@@ -528,10 +567,10 @@ function AbaSugestoes() {
         <ModalCorrigirSugestao
           sugestao={corrigindo}
           casoId={casoIdNumero}
-          canonicos={canonicos.data?.itens ?? []}
-          categorias={categorias}
           onFechar={() => setCorrigindo(null)}
           onSalvo={async () => {
+            removerDaSelecao(corrigindo.id);
+            voltarPaginaSeEsvaziou(1, "confirmado");
             setCorrigindo(null);
             await invalidarSugestoes();
           }}
@@ -544,100 +583,61 @@ function AbaSugestoes() {
 interface ModalCorrigirSugestaoProps {
   sugestao: SugestaoNormalizacao;
   casoId: number;
-  canonicos: ProdutoCanonico[];
-  categorias: string[];
   onFechar: () => void;
   onSalvo: () => void;
 }
 
-function ModalCorrigirSugestao({
-  sugestao,
-  casoId,
-  canonicos,
-  categorias,
-  onFechar,
-  onSalvo,
-}: ModalCorrigirSugestaoProps) {
+function ModalCorrigirSugestao({ sugestao, casoId, onFechar, onSalvo }: ModalCorrigirSugestaoProps) {
   const { notificar } = useToast();
-  const [escolha, setEscolha] = useState<string>(String(sugestao.produto_canonico_sugerido_id));
-  const [nomeNovo, setNomeNovo] = useState("");
-  const [categoriaNovo, setCategoriaNovo] = useState("");
-  const [salvando, setSalvando] = useState(false);
 
-  async function handleSubmit(evento: FormEvent) {
-    evento.preventDefault();
-    setSalvando(true);
+  // Só a sugestão pendente abre no sugerido pela IA. Nas demais (rejeitada ou
+  // já aprovada/corrigida), abre no canônico vinculado ao item, se houver.
+  const pendente = sugestao.status === "pendente";
+  const idInicial = pendente ? sugestao.produto_canonico_sugerido_id : sugestao.produto_canonico_vinculado_id;
+  const nomeInicial = pendente ? sugestao.nome_canonico : sugestao.nome_canonico_vinculado;
+
+  async function handleConfirmar(produtoCanonicoId: number) {
     try {
-      let produtoCanonicoId: number;
-      if (escolha === "novo") {
-        if (!nomeNovo.trim()) {
-          notificar("Informe o nome do novo produto canônico.", "erro");
-          setSalvando(false);
-          return;
-        }
-        const criado = await criarCanonico(casoId, nomeNovo.trim(), categoriaNovo.trim() || undefined);
-        produtoCanonicoId = criado.id;
-      } else {
-        produtoCanonicoId = Number(escolha);
-      }
-
       const resultado = await corrigirSugestao(sugestao.id, produtoCanonicoId);
       const [ok, mensagem] = traduzirResultadoUnitario(resultado, "Sugestão corrigida com sucesso.");
       notificar(mensagem, ok ? "sucesso" : "erro");
       if (ok) onSalvo();
     } catch (excecao) {
       notificar(excecao instanceof ErroApi ? excecao.message : "Erro de comunicação com a API.", "erro");
-    } finally {
-      setSalvando(false);
     }
   }
 
   return (
-    <Modal aberto onFechar={onFechar} titulo="Corrigir sugestão">
-      <form onSubmit={handleSubmit} className={estilos.formModal}>
-        <div className={estilos.grupoCampo}>
-          <label className={estilos.rotuloCampo}>Produto canônico</label>
-          <select
-            className={estilos.selectNativo}
-            value={escolha}
-            onChange={(evento) => setEscolha(evento.target.value)}
-          >
-            {canonicos.map((canonico) => (
-              <option key={canonico.id} value={canonico.id}>
-                {canonico.nome_canonico} ({canonico.categoria || "sem categoria"})
-              </option>
-            ))}
-            <option value="novo">+ Criar novo</option>
-          </select>
-        </div>
-
-        {escolha === "novo" && (
-          <>
-            <CampoTexto
-              rotulo="Nome canônico"
-              value={nomeNovo}
-              onChange={(evento) => setNomeNovo(evento.target.value)}
-              required
-            />
-            <SeletorCategoria
-              rotulo="Categoria"
-              valor={categoriaNovo}
-              categoriasExistentes={categorias}
-              onMudar={setCategoriaNovo}
-            />
-          </>
-        )}
-
-        <div className={estilos.acoesModal}>
-          <Botao type="button" variante="secundario" onClick={onFechar}>
-            Cancelar
-          </Botao>
-          <Botao type="submit" disabled={salvando}>
-            {salvando ? "Salvando..." : "Confirmar correção"}
-          </Botao>
-        </div>
-      </form>
-    </Modal>
+    <SeletorProdutoCanonico
+      casoId={casoId}
+      titulo="Escolher produto canônico"
+      contexto={
+        <>
+          <div className={estilos.contextoCampo}>
+            <span className={estilos.contextoRotulo}>PRODUTO ORIGINAL (NF-E)</span>
+            <span>{sugestao.descricao_original}</span>
+          </div>
+          <div className={estilos.contextoCampo}>
+            <span className={estilos.contextoRotulo}>SUGESTÃO DA IA</span>
+            <span className={estilos.pilula}>{sugestao.nome_canonico}</span>
+          </div>
+          <div className={estilos.contextoCampo}>
+            <span className={estilos.contextoRotulo}>STATUS</span>
+            <Badge status={STATUS_PARA_BADGE[sugestao.status]} rotulo={STATUS_PARA_ROTULO[sugestao.status]} />
+          </div>
+          <div className={estilos.contextoCampo}>
+            <span className={estilos.contextoRotulo}>FORNECEDOR</span>
+            <span>{sugestao.fornecedor ?? "-"}</span>
+          </div>
+        </>
+      }
+      idDestacado={sugestao.produto_canonico_sugerido_id}
+      idInicial={idInicial ?? undefined}
+      nomeInicial={nomeInicial ?? undefined}
+      rotuloConfirmar="Confirmar escolha"
+      onConfirmar={handleConfirmar}
+      onFechar={onFechar}
+    />
   );
 }
 
@@ -660,12 +660,7 @@ function AbaCanonicos() {
     return () => clearTimeout(temporizador);
   }, [buscaDigitada]);
 
-  const todosCanonicos = useCanonicosDoCaso(casoIdNumero);
-  const categorias = useMemo(
-    () =>
-      Array.from(new Set((todosCanonicos.data?.itens ?? []).map((c) => c.categoria).filter(Boolean))) as string[],
-    [todosCanonicos.data]
-  );
+  const categorias = useCategoriasDoCaso(casoIdNumero).data ?? [];
 
   const canonicos = useQuery({
     queryKey: ["canonicos-tabela", casoIdNumero, categoriaFiltro, busca, offset],
@@ -713,7 +708,6 @@ function AbaCanonicos() {
             type="button"
             className={estilos.acaoNeutra}
             title="Transferir para outro produto canônico"
-            disabled={(todosCanonicos.data?.itens.length ?? 0) < 2}
             onClick={() => setTransferindo(canonico)}
           >
             ⇄
@@ -783,7 +777,8 @@ function AbaCanonicos() {
           onSalvo={async () => {
             setEditando(null);
             await queryClient.invalidateQueries({ queryKey: ["canonicos-tabela", casoIdNumero] });
-            await queryClient.invalidateQueries({ queryKey: ["canonicos-todos", casoIdNumero] });
+            await queryClient.invalidateQueries({ queryKey: ["canonicos-categorias", casoIdNumero] });
+            await queryClient.invalidateQueries({ queryKey: ["canonicos-busca", casoIdNumero] });
             notificar("Produto canônico atualizado com sucesso.", "sucesso");
           }}
         />
@@ -792,7 +787,7 @@ function AbaCanonicos() {
       {transferindo && (
         <ModalTransferirCanonico
           origem={transferindo}
-          canonicos={todosCanonicos.data?.itens ?? []}
+          casoId={casoIdNumero}
           onFechar={() => setTransferindo(null)}
           onTransferido={async (nomeDestino, itensMovidos) => {
             // A origem some da lista. Se ela era a única linha desta página
@@ -802,7 +797,8 @@ function AbaCanonicos() {
             setTransferindo(null);
             if (eraUnicaDaPagina && offset > 0) setOffset(Math.max(0, offset - LIMITE_CANONICOS));
             await queryClient.invalidateQueries({ queryKey: ["canonicos-tabela", casoIdNumero] });
-            await queryClient.invalidateQueries({ queryKey: ["canonicos-todos", casoIdNumero] });
+            await queryClient.invalidateQueries({ queryKey: ["canonicos-categorias", casoIdNumero] });
+            await queryClient.invalidateQueries({ queryKey: ["canonicos-busca", casoIdNumero] });
             await queryClient.invalidateQueries({ queryKey: ["itens-vinculados"] });
             notificar(
               `Produto transferido para "${nomeDestino}": ${itensMovidos} ${
@@ -871,59 +867,33 @@ function ModalEditarCanonico({ canonico, categorias, onFechar, onSalvo }: ModalE
 
 interface ModalTransferirCanonicoProps {
   origem: ProdutoCanonico;
-  canonicos: ProdutoCanonico[];
+  casoId: number;
   onFechar: () => void;
   onTransferido: (nomeDestino: string, itensMovidos: number) => void;
 }
 
 /**
  * Absorve o canônico da linha (origem) em outro do mesmo caso. Operação
- * irreversível -- por isso o destino nasce vazio (escolha explícita) e o
+ * irreversível -- por isso não há seleção inicial (escolha explícita) e o
  * botão de confirmar só habilita depois da escolha.
  */
-function ModalTransferirCanonico({ origem, canonicos, onFechar, onTransferido }: ModalTransferirCanonicoProps) {
+function ModalTransferirCanonico({ origem, casoId, onFechar, onTransferido }: ModalTransferirCanonicoProps) {
   const { notificar } = useToast();
-  const destinos = useMemo(() => canonicos.filter((c) => c.id !== origem.id), [canonicos, origem.id]);
-  const [destinoId, setDestinoId] = useState("");
-  const [transferindo, setTransferindo] = useState(false);
 
-  async function handleSubmit(evento: FormEvent) {
-    evento.preventDefault();
-    if (!destinoId) {
-      notificar("Escolha o produto canônico de destino.", "erro");
-      return;
-    }
-    setTransferindo(true);
+  async function handleConfirmar(destinoId: number) {
     try {
-      const resultado = await transferirCanonico(origem.id, Number(destinoId));
+      const resultado = await transferirCanonico(origem.id, destinoId);
       onTransferido(resultado.nome_canonico, resultado.itens_movidos);
     } catch (excecao) {
       notificar(excecao instanceof ErroApi ? excecao.message : "Erro de comunicação com a API.", "erro");
-    } finally {
-      setTransferindo(false);
     }
   }
 
   return (
-    <Modal aberto onFechar={onFechar} titulo="Transferir produto canônico">
-      <form onSubmit={handleSubmit} className={estilos.formModal}>
-        <div className={estilos.grupoCampo}>
-          <label className={estilos.rotuloCampo}>Transferir &quot;{origem.nome_canonico}&quot; para</label>
-          <select
-            className={estilos.selectNativo}
-            value={destinoId}
-            onChange={(evento) => setDestinoId(evento.target.value)}
-            aria-label="Produto canônico de destino"
-          >
-            <option value="">Selecione o produto de destino...</option>
-            {destinos.map((canonico) => (
-              <option key={canonico.id} value={canonico.id}>
-                {canonico.nome_canonico} ({canonico.categoria || "sem categoria"})
-              </option>
-            ))}
-          </select>
-        </div>
-
+    <SeletorProdutoCanonico
+      casoId={casoId}
+      titulo="Transferir produto canônico"
+      contexto={
         <p className={estilos.avisoModal}>
           Os {origem.itens_vinculados_count}{" "}
           {origem.itens_vinculados_count === 1 ? "item vinculado" : "itens vinculados"} a &quot;
@@ -932,16 +902,11 @@ function ModalTransferirCanonico({ origem, canonicos, onFechar, onTransferido }:
           citavam esta origem. Em seguida, &quot;{origem.nome_canonico}&quot; é excluído. Esta ação
           não pode ser desfeita.
         </p>
-
-        <div className={estilos.acoesModal}>
-          <Botao type="button" variante="secundario" onClick={onFechar}>
-            Cancelar
-          </Botao>
-          <Botao type="submit" disabled={transferindo || !destinoId}>
-            {transferindo ? "Transferindo..." : "Confirmar transferência"}
-          </Botao>
-        </div>
-      </form>
-    </Modal>
+      }
+      idsExcluidos={[origem.id]}
+      rotuloConfirmar="Transferir"
+      onConfirmar={handleConfirmar}
+      onFechar={onFechar}
+    />
   );
 }

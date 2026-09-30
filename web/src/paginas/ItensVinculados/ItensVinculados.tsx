@@ -1,16 +1,13 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { criarCanonico, listarCanonicos, listarItensVinculados, reatribuirItem } from "../../api/produtos";
+import { listarItensVinculados, reatribuirItem } from "../../api/produtos";
 import { ErroApi } from "../../api/cliente";
-import type { ItemVinculado, ProdutoCanonico, TipoNota } from "../../api/tipos";
+import type { ItemVinculado, TipoNota } from "../../api/tipos";
 import { Badge } from "../../componentes/Badge";
-import { Botao } from "../../componentes/Botao";
-import { CampoTexto } from "../../componentes/CampoTexto";
 import { Card } from "../../componentes/Card";
-import { Modal } from "../../componentes/Modal";
 import { Paginacao } from "../../componentes/Paginacao";
-import { SeletorCategoria } from "../../componentes/SeletorCategoria";
+import { SeletorProdutoCanonico } from "../../componentes/SeletorProdutoCanonico/SeletorProdutoCanonico";
 import { Tabela, type ColunaTabela } from "../../componentes/Tabela";
 import { useToast } from "../../componentes/Toast";
 import estilos from "./ItensVinculados.module.css";
@@ -72,17 +69,6 @@ export function ItensVinculados() {
     enabled: Number.isFinite(produtoCanonicoIdNumero),
   });
 
-  const canonicosDoCaso = useQuery({
-    queryKey: ["canonicos-todos", casoIdNumero],
-    queryFn: () => listarCanonicos({ clienteCasoId: casoIdNumero, limit: 500 }),
-    enabled: Number.isFinite(casoIdNumero),
-  });
-  const categorias = useMemo(
-    () =>
-      Array.from(new Set((canonicosDoCaso.data?.itens ?? []).map((c) => c.categoria).filter(Boolean))) as string[],
-    [canonicosDoCaso.data]
-  );
-
   function resetarPagina() {
     setOffset(0);
   }
@@ -91,7 +77,8 @@ export function ItensVinculados() {
     setReatribuindo(null);
     notificar("Item reatribuído com sucesso.", "sucesso");
     await queryClient.invalidateQueries({ queryKey: ["itens-vinculados", produtoCanonicoIdNumero] });
-    await queryClient.invalidateQueries({ queryKey: ["canonicos-todos", casoIdNumero] });
+    await queryClient.invalidateQueries({ queryKey: ["canonicos-categorias", casoIdNumero] });
+    await queryClient.invalidateQueries({ queryKey: ["canonicos-busca", casoIdNumero] });
     await queryClient.invalidateQueries({ queryKey: ["canonicos-tabela", casoIdNumero] });
   }
 
@@ -234,8 +221,7 @@ export function ItensVinculados() {
         <ModalReatribuirItem
           item={reatribuindo}
           casoId={casoIdNumero}
-          canonicos={canonicosDoCaso.data?.itens ?? []}
-          categorias={categorias}
+          canonicoAtualId={Number(produtoCanonicoId)}
           onFechar={() => setReatribuindo(null)}
           onSalvo={handleReatribuido}
         />
@@ -247,101 +233,39 @@ export function ItensVinculados() {
 interface ModalReatribuirItemProps {
   item: ItemVinculado;
   casoId: number;
-  canonicos: ProdutoCanonico[];
-  categorias: string[];
+  /** Canônico da página atual: o item já está nele, então não é opção de destino. */
+  canonicoAtualId: number;
   onFechar: () => void;
   onSalvo: () => void;
 }
 
-function ModalReatribuirItem({ item, casoId, canonicos, categorias, onFechar, onSalvo }: ModalReatribuirItemProps) {
+const SEM_EXCLUIDOS: number[] = [];
+
+function ModalReatribuirItem({ item, casoId, canonicoAtualId, onFechar, onSalvo }: ModalReatribuirItemProps) {
   const { notificar } = useToast();
-  const [escolha, setEscolha] = useState<string>("");
-  const [nomeNovo, setNomeNovo] = useState("");
-  const [categoriaNovo, setCategoriaNovo] = useState("");
-  const [salvando, setSalvando] = useState(false);
 
-  async function handleSubmit(evento: FormEvent) {
-    evento.preventDefault();
-    if (!escolha) {
-      notificar("Escolha um produto canônico ou crie um novo.", "erro");
-      return;
-    }
-    setSalvando(true);
+  async function handleConfirmar(produtoCanonicoId: number) {
     try {
-      let produtoCanonicoId: number;
-      if (escolha === "novo") {
-        if (!nomeNovo.trim()) {
-          notificar("Informe o nome do novo produto canônico.", "erro");
-          setSalvando(false);
-          return;
-        }
-        const criado = await criarCanonico(casoId, nomeNovo.trim(), categoriaNovo.trim() || undefined);
-        produtoCanonicoId = criado.id;
-      } else {
-        produtoCanonicoId = Number(escolha);
-      }
-
       await reatribuirItem(item.id, produtoCanonicoId);
       onSalvo();
     } catch (excecao) {
       notificar(excecao instanceof ErroApi ? excecao.message : "Erro de comunicação com a API.", "erro");
-    } finally {
-      setSalvando(false);
     }
   }
 
   return (
-    <Modal aberto onFechar={onFechar} titulo="Alterar produto canônico do item">
-      <form onSubmit={handleSubmit} className={estilos.formModal}>
+    <SeletorProdutoCanonico
+      casoId={casoId}
+      titulo="Alterar produto canônico do item"
+      contexto={
         <p className={estilos.itemDescricao}>
           Item: <strong>{item.descricao_original}</strong>
         </p>
-
-        <div className={estilos.grupoCampo}>
-          <label className={estilos.rotuloCampo}>Novo produto canônico</label>
-          <select
-            className={estilos.selectNativo}
-            value={escolha}
-            onChange={(evento) => setEscolha(evento.target.value)}
-          >
-            <option value="" disabled>
-              Selecione...
-            </option>
-            {canonicos.map((canonico) => (
-              <option key={canonico.id} value={canonico.id}>
-                {canonico.nome_canonico} ({canonico.categoria || "sem categoria"})
-              </option>
-            ))}
-            <option value="novo">+ Criar novo</option>
-          </select>
-        </div>
-
-        {escolha === "novo" && (
-          <>
-            <CampoTexto
-              rotulo="Nome canônico"
-              value={nomeNovo}
-              onChange={(evento) => setNomeNovo(evento.target.value)}
-              required
-            />
-            <SeletorCategoria
-              rotulo="Categoria"
-              valor={categoriaNovo}
-              categoriasExistentes={categorias}
-              onMudar={setCategoriaNovo}
-            />
-          </>
-        )}
-
-        <div className={estilos.acoesModal}>
-          <Botao type="button" variante="secundario" onClick={onFechar}>
-            Cancelar
-          </Botao>
-          <Botao type="submit" disabled={salvando}>
-            {salvando ? "Salvando..." : "Salvar alterações"}
-          </Botao>
-        </div>
-      </form>
-    </Modal>
+      }
+      idsExcluidos={Number.isFinite(canonicoAtualId) ? [canonicoAtualId] : SEM_EXCLUIDOS}
+      rotuloConfirmar="Salvar alterações"
+      onConfirmar={handleConfirmar}
+      onFechar={onFechar}
+    />
   );
 }
