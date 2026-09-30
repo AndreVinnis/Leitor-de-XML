@@ -7,13 +7,18 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.ai.consulta_nl_sql import FINALIDADES_VALIDAS, MAX_CONSULTAS, gerar_plano_consulta
+from app.core import limite_taxa
 from app.core.auth import usuario_atual_ativo
-from app.core.database import SessionLocal
+from app.core.database import SessionConsulta, SessionLocal
 from app.core.resposta_consulta import RespostaInvalida, ResultadoSql, montar_resposta
 from app.core.sql_seguranca import SqlInseguro, validar_e_finalizar_sql
 from app.models.models import LogAuditoria, ProdutoCanonico, Usuario
 
 router = APIRouter()
+
+# Teto da pergunta: cada chamada vai inteira para o Claude, então o tamanho
+# é custo direto (e superfície de prompt injection).
+TAMANHO_MAXIMO_PERGUNTA = 1000
 
 _REGEX_LIMIT_FINAL = re.compile(r"LIMIT\s+(\d+)\s*;?\s*$", re.IGNORECASE)
 
@@ -41,9 +46,15 @@ def _limite_da_consulta(sql: str) -> Optional[int]:
     return int(match.group(1)) if match else None
 
 
-@router.post("")
-async def consultar(
-    pergunta: str = Body(..., embed=True),
+@router.post(
+    "",
+    dependencies=[
+        Depends(limite_taxa.consulta_por_minuto),
+        Depends(limite_taxa.consulta_por_dia),
+    ],
+)
+def consultar(
+    pergunta: str = Body(..., embed=True, min_length=1, max_length=TAMANHO_MAXIMO_PERGUNTA),
     cliente_caso_id: int = Body(..., embed=True),
     usuario: Usuario = Depends(usuario_atual_ativo),
 ):
@@ -127,11 +138,17 @@ async def consultar(
         except SqlInseguro as erro:
             _bloquear(str(erro), sqls_brutos)
 
+        # O SQL gerado roda numa conexão própria (usuário só-SELECT em
+        # produção -- ver app/core/database.py::SessionConsulta); canônicos e
+        # LogAuditoria continuam na conexão principal.
+        db_consulta: Session = SessionConsulta()
         try:
             resultados_por_indice: list[ResultadoSql] = []
             consultas_executadas = []
             for finalidade, sql_final in sqls_finais:
-                resultado = db.execute(text(sql_final), {"cliente_caso_id": cliente_caso_id})
+                resultado = db_consulta.execute(
+                    text(sql_final), {"cliente_caso_id": cliente_caso_id}
+                )
                 colunas = list(resultado.keys())
                 linhas = [list(linha) for linha in resultado.fetchall()]
                 resultados_por_indice.append(
@@ -150,7 +167,7 @@ async def consultar(
                     }
                 )
         except SQLAlchemyError as erro:
-            db.rollback()
+            db_consulta.rollback()
             db.add(
                 LogAuditoria(
                     usuario_id=usuario.id,
@@ -165,6 +182,8 @@ async def consultar(
                 status_code=502,
                 detail="Não foi possível executar a consulta gerada. Tente reformular a pergunta.",
             ) from erro
+        finally:
+            db_consulta.close()
 
         resposta_texto = None
         motivo_resposta_nula = None

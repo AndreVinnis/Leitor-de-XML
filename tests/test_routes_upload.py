@@ -143,3 +143,121 @@ def test_upload_acima_do_limite_retorna_422_e_nao_cria_lote(
     session = db_session_factory()
     assert session.query(Lote).count() == 0
     session.close()
+
+
+def _preparar_upload_isolado(db_session_factory, logar_usuario, monkeypatch, tmp_path):
+    """UPLOAD_DIR vai para tmp_path: os testes de nome malicioso precisam
+    enxergar exatamente o que foi gravado (e o que não foi) em disco."""
+    monkeypatch.setattr("app.api.routes_upload.UPLOAD_DIR", tmp_path / "uploads")
+    fake_task = MagicMock()
+    fake_task.id = "fake-task-id"
+    fake_processar = MagicMock()
+    fake_processar.delay = MagicMock(return_value=fake_task)
+    monkeypatch.setattr("app.api.routes_upload.processar_xml_nfe", fake_processar)
+
+    session = db_session_factory()
+    usuario = _criar_usuario(session)
+    caso = _criar_caso(session)
+    session.close()
+    logar_usuario(usuario)
+    return caso
+
+
+def _enviar(client, caso, nomes_e_conteudos):
+    return client.post(
+        "/api/notas/upload",
+        data={"cliente_caso_id": caso.id, "cnpj_cliente": CNPJ_CLIENTE},
+        files=[
+            ("arquivos", (nome, BytesIO(conteudo), "text/xml"))
+            for nome, conteudo in nomes_e_conteudos
+        ],
+    )
+
+
+def _arquivos_gravados(raiz):
+    return sorted(p.relative_to(raiz).as_posix() for p in raiz.rglob("*") if p.is_file())
+
+
+def test_upload_com_nome_de_caminho_grava_so_o_basename_dentro_do_lote(
+    client, db_session_factory, logar_usuario, monkeypatch, tmp_path
+):
+    """Path traversal: o nome do multipart vem do cliente e não pode
+    escapar do diretório do lote, nem com ../, nem absoluto, nem com barra invertida."""
+    caso = _preparar_upload_isolado(db_session_factory, logar_usuario, monkeypatch, tmp_path)
+
+    resp = _enviar(
+        client,
+        caso,
+        [
+            ("../../fora1.xml", b"<a/>"),
+            ("/etc/fora2.xml", b"<a/>"),
+            (r"..\..\fora3.xml", b"<a/>"),
+        ],
+    )
+
+    assert resp.status_code == 200
+    lote_id = resp.json()["lote_id"]
+    assert _arquivos_gravados(tmp_path) == [
+        f"uploads/{lote_id}/fora1.xml",
+        f"uploads/{lote_id}/fora2.xml",
+        f"uploads/{lote_id}/fora3.xml",
+    ]
+    session = db_session_factory()
+    nomes = sorted(a.nome_arquivo for a in session.query(ArquivoLote).all())
+    session.close()
+    assert nomes == ["fora1.xml", "fora2.xml", "fora3.xml"]
+
+
+def test_upload_com_nomes_repetidos_nao_sobrescreve(
+    client, db_session_factory, logar_usuario, monkeypatch, tmp_path
+):
+    caso = _preparar_upload_isolado(db_session_factory, logar_usuario, monkeypatch, tmp_path)
+
+    resp = _enviar(client, caso, [("nota.xml", b"<um/>"), ("pasta/nota.xml", b"<dois/>")])
+
+    assert resp.status_code == 200
+    lote_dir = tmp_path / "uploads" / resp.json()["lote_id"]
+    assert (lote_dir / "nota.xml").read_bytes() == b"<um/>"
+    assert (lote_dir / "2_nota.xml").read_bytes() == b"<dois/>"
+
+
+def test_upload_de_arquivo_que_nao_e_xml_retorna_422_e_desfaz_o_lote(
+    client, db_session_factory, logar_usuario, monkeypatch, tmp_path
+):
+    caso = _preparar_upload_isolado(db_session_factory, logar_usuario, monkeypatch, tmp_path)
+
+    resp = _enviar(client, caso, [("nota.xml", b"<a/>"), ("script.py", b"print(1)")])
+
+    assert resp.status_code == 422
+    assert _arquivos_gravados(tmp_path) == []
+    session = db_session_factory()
+    assert session.query(Lote).count() == 0
+    assert session.query(ArquivoLote).count() == 0
+    session.close()
+
+
+def test_upload_acima_do_tamanho_por_arquivo_retorna_413_e_desfaz_o_lote(
+    client, db_session_factory, logar_usuario, monkeypatch, tmp_path
+):
+    caso = _preparar_upload_isolado(db_session_factory, logar_usuario, monkeypatch, tmp_path)
+    monkeypatch.setattr("app.api.routes_upload.settings.upload_max_bytes_por_arquivo", 10)
+
+    resp = _enviar(client, caso, [("pequena.xml", b"<a/>"), ("grande.xml", b"<a>" + b"x" * 50 + b"</a>")])
+
+    assert resp.status_code == 413
+    assert _arquivos_gravados(tmp_path) == []
+    session = db_session_factory()
+    assert session.query(Lote).count() == 0
+    session.close()
+
+
+def test_upload_acima_do_tamanho_do_lote_retorna_413(
+    client, db_session_factory, logar_usuario, monkeypatch, tmp_path
+):
+    caso = _preparar_upload_isolado(db_session_factory, logar_usuario, monkeypatch, tmp_path)
+    monkeypatch.setattr("app.api.routes_upload.settings.upload_max_bytes_por_lote", 30)
+
+    resp = _enviar(client, caso, [("a.xml", b"<a>" + b"x" * 15 + b"</a>"), ("b.xml", b"<a>" + b"x" * 15 + b"</a>")])
+
+    assert resp.status_code == 413
+    assert _arquivos_gravados(tmp_path) == []

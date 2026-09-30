@@ -40,7 +40,7 @@ export function RedefinirSenha() {
       if (excecao instanceof ErroApi && excecao.status === 400 && excecao.message.includes("RESET_PASSWORD_BAD_TOKEN")) {
         setErro("Este link expirou ou já foi usado. Solicite uma nova redefinição na tela de login.");
       } else if (excecao instanceof ErroApi && excecao.status === 400 && excecao.message.includes("RESET_PASSWORD_INVALID_PASSWORD")) {
-        setErro("A senha não atende aos requisitos mínimos.");
+        setErro("A senha precisa ter pelo menos 8 caracteres e não pode conter o seu e-mail.");
       } else {
         setErro("Não foi possível redefinir a senha. Tente novamente em alguns instantes.");
       }

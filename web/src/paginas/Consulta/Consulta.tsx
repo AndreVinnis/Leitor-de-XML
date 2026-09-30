@@ -29,6 +29,8 @@ function formatarCelula(valor: unknown): string {
 const LIMITE_DOWNLOAD_NOTAS = 500;
 
 const ITENS_POR_PAGINA = 30;
+// Mesmo teto do backend (routes_consulta.TAMANHO_MAXIMO_PERGUNTA).
+const TAMANHO_MAXIMO_PERGUNTA = 1000;
 
 interface EstadoConsulta {
   pergunta: string;
@@ -154,8 +156,12 @@ export function Consulta() {
           value={pergunta}
           onChange={(evento) => setPergunta(evento.target.value)}
           rows={3}
+          maxLength={TAMANHO_MAXIMO_PERGUNTA}
         />
         <div className={estilos.acaoConsultar}>
+          <span className={estilos.contadorPergunta}>
+            {pergunta.length}/{TAMANHO_MAXIMO_PERGUNTA}
+          </span>
           <Botao onClick={handleConsultar} disabled={!pergunta.trim() || consultando}>
             {consultando ? "Consultando..." : "Consultar"}
           </Botao>

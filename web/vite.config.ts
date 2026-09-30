@@ -21,6 +21,11 @@ export default defineConfig({
       "/api": {
         target: "http://api:8000",
         changeOrigin: true,
+        // Repassa o IP do browser em X-Forwarded-For. O uvicorn só confia
+        // nele vindo dos IPs de FORWARDED_ALLOW_IPS (docker-compose.yml), e
+        // é esse IP que o limite de tentativas por IP usa
+        // (app/core/limite_taxa.py).
+        xfwd: true,
       },
     },
   },

@@ -6,7 +6,7 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, aliased
 
 from app.ai.embeddings import gerar_embeddings, serializar_embedding
-from app.core import trava_normalizacao
+from app.core import limite_taxa, trava_normalizacao
 from app.core.auth import usuario_atual_ativo
 from app.core.config import settings
 from app.core.database import SessionLocal
@@ -27,7 +27,7 @@ from app.workers.tasks import normalizar_produtos_pendentes
 router = APIRouter()
 
 
-@router.post("/normalizar")
+@router.post("/normalizar", dependencies=[Depends(limite_taxa.normalizacao_por_hora)])
 async def disparar_normalizacao(
     cliente_caso_id: int = Body(..., embed=True),
     usuario: Usuario = Depends(usuario_atual_ativo),

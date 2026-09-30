@@ -1,0 +1,4 @@
+# Scripts shell rodam dentro de containers Linux (ex.: docker/mysql/, montado
+# no container do banco). Com core.autocrlf=true no Windows, sairiam com CRLF
+# no checkout e o sh quebraria.
+*.sh text eol=lf

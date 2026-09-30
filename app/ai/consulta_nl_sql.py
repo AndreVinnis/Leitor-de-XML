@@ -130,6 +130,8 @@ produtos_canonicos (por produto_canonico_id) e/ou notas (por nota_id) \
 conforme necessário para responder quantidade, valor total, preço e \
 categoria.
 - Não use nenhuma tabela ou coluna fora da lista acima.
+- Não use comentários SQL, variáveis (@), WITH/CTE nem LIMIT acima de 200 \
+-- o backend recusa a consulta inteira se encontrar qualquer um deles.
 
 Como decidir o formato do plano (campo "consultas", uma lista):
 1. Pergunta de LISTAGEM (o usuário quer ver notas ou itens individuais, não \

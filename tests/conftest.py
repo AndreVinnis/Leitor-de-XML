@@ -1,4 +1,9 @@
+import os
 from unittest.mock import MagicMock
+
+# Antes de qualquer `import app...`: app/core/config.py recusa subir sem uma
+# SECRET_KEY forte, e o CI não tem .env.
+os.environ.setdefault("SECRET_KEY", "chave-de-teste-apenas-para-pytest-0123456789abcdef")
 
 import pytest
 from fastapi.testclient import TestClient
@@ -92,6 +97,27 @@ def trava_normalizacao(monkeypatch):
     return trava
 
 
+class LimiteTaxaFalso:
+    """Substitui o Redis de app/core/limite_taxa.py por um contador em dict
+    (janela nunca expira dentro de um teste)."""
+
+    def __init__(self):
+        self.contagens: dict[str, int] = {}
+
+    def incrementar(self, chave, janela_s):
+        self.contagens[chave] = self.contagens.get(chave, 0) + 1
+        return self.contagens[chave], janela_s
+
+
+@pytest.fixture(autouse=True)
+def limite_taxa(monkeypatch):
+    """Mesmo racional de trava_normalizacao: em CI não existe Redis. Zerado
+    a cada teste, então nenhum teste esbarra no limite de outro."""
+    falso = LimiteTaxaFalso()
+    monkeypatch.setattr("app.core.limite_taxa._incrementar", falso.incrementar)
+    return falso
+
+
 @pytest.fixture
 def db_session_factory(monkeypatch):
     """
@@ -123,6 +149,7 @@ def db_session_factory(monkeypatch):
     monkeypatch.setattr("app.api.routes_notas.SessionLocal", TestSessionLocal)
     monkeypatch.setattr("app.api.routes_dashboard.SessionLocal", TestSessionLocal)
     monkeypatch.setattr("app.api.routes_consulta.SessionLocal", TestSessionLocal)
+    monkeypatch.setattr("app.api.routes_consulta.SessionConsulta", TestSessionLocal)
     monkeypatch.setattr("app.api.routes_usuarios.SessionLocal", TestSessionLocal)
     monkeypatch.setattr("app.api.routes_auditoria.SessionLocal", TestSessionLocal)
     monkeypatch.setattr("app.scripts.backfill_embeddings.SessionLocal", TestSessionLocal)

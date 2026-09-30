@@ -32,6 +32,10 @@ export function CriarConta() {
     } catch (excecao) {
       if (excecao instanceof ErroApi && excecao.status === 400 && excecao.message.includes("REGISTER_USER_ALREADY_EXISTS")) {
         setErro("Esse e-mail já está cadastrado.");
+      } else if (excecao instanceof ErroApi && excecao.status === 400 && excecao.message.includes("REGISTER_INVALID_PASSWORD")) {
+        setErro("A senha precisa ter pelo menos 8 caracteres e não pode conter o seu e-mail.");
+      } else if (excecao instanceof ErroApi && excecao.status === 429) {
+        setErro(excecao.message);
       } else if (excecao instanceof ErroApi && excecao.status === 422) {
         setErro("Verifique se o e-mail é válido e a senha tem pelo menos 8 caracteres.");
       } else {

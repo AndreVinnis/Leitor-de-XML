@@ -1,11 +1,13 @@
 import shutil
+import unicodedata
 import uuid
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.auth import usuario_atual_ativo
+from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.validadores import validar_cnpj_obrigatorio
 from app.models.models import ArquivoLote, Lote, StatusProcessamento, Usuario
@@ -23,6 +25,62 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 # docstring de upload_notas). Em 1000 esse teto dispara primeiro e devolve
 # um 400 genérico do Starlette em vez da mensagem 422 em PT-BR abaixo.
 LIMITE_ARQUIVOS_POR_LOTE = 999
+
+_TAMANHO_BLOCO_COPIA = 1024 * 1024
+
+
+class _UploadRecusado(Exception):
+    """Arquivo do lote recusado (nome ou tamanho) -- vira HTTPException
+    depois de desfazer o que já foi gravado em disco e no banco."""
+
+    def __init__(self, status_code: int, detail: str):
+        super().__init__(detail)
+        self.status_code = status_code
+        self.detail = detail
+
+
+def _nome_arquivo_seguro(nome: str | None) -> str:
+    """
+    Reduz o nome enviado pelo cliente ao basename, sem diretório nenhum.
+
+    O nome vem do Content-Disposition do multipart e o Starlette não o limpa:
+    `../../code/app/main.py` ou `/etc/x` gravariam fora do diretório do lote
+    (com `--reload` e o bind mount do compose, isso vira execução de código).
+    PureWindowsPath primeiro porque ele entende tanto a barra invertida quanto `/`.
+    """
+    base = Path(PureWindowsPath(nome or "").name).name
+    base = "".join(c for c in base if unicodedata.category(c)[0] != "C")
+    base = base.replace('"', "").strip()
+    if base in ("", ".", ".."):
+        raise _UploadRecusado(422, "Nome de arquivo inválido no lote.")
+    if not base.lower().endswith(".xml"):
+        raise _UploadRecusado(422, f"Arquivo '{base}' não é XML (.xml).")
+    return base
+
+
+def _copiar_com_limite(origem, destino: Path, restante_lote: int) -> int:
+    """Copia em blocos e para assim que passar do teto por arquivo ou do
+    que ainda cabe no lote. Devolve os bytes gravados."""
+    limite_arquivo = settings.upload_max_bytes_por_arquivo
+    total = 0
+    with destino.open("wb") as f:
+        while bloco := origem.read(_TAMANHO_BLOCO_COPIA):
+            total += len(bloco)
+            if total > limite_arquivo:
+                raise _UploadRecusado(
+                    413,
+                    f"Arquivo '{destino.name}' excede o máximo de "
+                    f"{limite_arquivo // (1024 * 1024)} MB por arquivo.",
+                )
+            if total > restante_lote:
+                raise _UploadRecusado(
+                    413,
+                    "Lote excede o máximo de "
+                    f"{settings.upload_max_bytes_por_lote // (1024 * 1024)} MB. "
+                    "Divida em lotes menores.",
+                )
+            f.write(bloco)
+    return total
 
 
 @router.post("/upload")
@@ -78,14 +136,30 @@ def upload_notas(
         db.flush()  # garante lote.id disponível para a FK de arquivo_lote
 
         arquivos_lote = []
+        nomes_usados: set[str] = set()
+        restante_lote = settings.upload_max_bytes_por_lote
+        raiz_lote = lote_dir.resolve()
         for arquivo in arquivos:
-            destino = lote_dir / arquivo.filename
-            with destino.open("wb") as f:
-                shutil.copyfileobj(arquivo.file, f)
+            nome = _nome_arquivo_seguro(arquivo.filename)
+            # Mesmo nome duas vezes no lote: sem isto o segundo sobrescrevia
+            # o primeiro em disco, e as duas notas apontariam para o mesmo XML.
+            candidato, contador = nome, 1
+            while candidato.lower() in nomes_usados:
+                contador += 1
+                candidato = f"{contador}_{nome}"
+            nome = candidato
+            nomes_usados.add(nome.lower())
+
+            destino = lote_dir / nome
+            # Defesa em profundidade: mesmo padrão de
+            # routes_notas._caminho_xml_seguro.
+            if not destino.resolve().is_relative_to(raiz_lote):
+                raise _UploadRecusado(422, "Nome de arquivo inválido no lote.")
+            restante_lote -= _copiar_com_limite(arquivo.file, destino, restante_lote)
 
             arquivo_lote = ArquivoLote(
                 lote_id=lote.id,
-                nome_arquivo=arquivo.filename,
+                nome_arquivo=nome,
                 status=StatusProcessamento.PENDENTE,
             )
             db.add(arquivo_lote)
@@ -112,6 +186,10 @@ def upload_notas(
             "total_arquivos": len(arquivos),
             "task_ids": task_ids,
         }
+    except _UploadRecusado as exc:
+        db.rollback()
+        shutil.rmtree(lote_dir, ignore_errors=True)
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     finally:
         db.close()
 
