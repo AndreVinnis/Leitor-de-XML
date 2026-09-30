@@ -29,3 +29,16 @@
   color: var(--cor-texto);
   margin: 0;
 }
+
+.largo {
+  max-width: 1000px;
+  width: calc(100% - 2 * var(--espaco-4));
+  max-height: 92vh;
+  overflow-y: auto;
+}
+
+.descricao {
+  margin: calc(-1 * var(--espaco-2)) 0 0;
+  font-size: 13px;
+  color: var(--cor-texto-secundario);
+}

@@ -141,6 +141,10 @@ export interface SugestaoNormalizacao {
   descricao_original: string;
   produto_canonico_sugerido_id: number;
   nome_canonico: string;
+  // Canônico em que o item está de fato vinculado (pode diferir da sugestão
+  // quando a sugestão foi corrigida/rejeitada e o item reatribuído).
+  produto_canonico_vinculado_id: number | null;
+  nome_canonico_vinculado: string | null;
   categoria: string | null;
   fornecedor: string | null;
   confianca: number;
