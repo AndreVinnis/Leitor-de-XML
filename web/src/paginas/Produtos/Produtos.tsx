@@ -277,6 +277,8 @@ function AbaSugestoes() {
       }),
   });
 
+  const totalFiltro = sugestoes.data?.total ?? null;
+
   function resetarPagina() {
     setOffset(0);
     setSelecionados(new Set());
@@ -535,6 +537,9 @@ function AbaSugestoes() {
       </div>
 
       <div className={estilos.barraLote}>
+        <span className={estilos.quantidadeFiltro} role="status">
+          {totalFiltro === null ? "-" : `${totalFiltro} ${totalFiltro === 1 ? "item" : "itens"}`}
+        </span>
         <span className={estilos.contadorSelecionados}>{selecionados.size} selecionado(s)</span>
         <Botao
           variante="secundario"

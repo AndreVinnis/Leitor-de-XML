@@ -148,10 +148,39 @@
 }
 
 .barraLote {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: var(--espaco-3);
+}
+
+/* Quantidade de sugestões do filtro de status selecionado, embaixo de
+   "Todos" + "Pendentes" (Figma, tela 04, nó 272:1470). Posição absoluta para
+   não alterar a altura nem o alinhamento da barra. */
+.quantidadeFiltro {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 180px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+  border: 1px solid var(--cor-primaria);
+  border-radius: var(--raio-borda);
+  background: var(--cor-superficie);
+  color: var(--cor-primaria);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* No tema escuro o vinho primário some sobre a superfície escura: usa o rosa
+   (--cor-accent do escuro, mesmo tom do .acaoEscolher). */
+:global(:root[data-tema="escuro"]) .quantidadeFiltro {
+  border-color: var(--cor-accent);
+  color: var(--cor-accent);
 }
 
 .contadorSelecionados {
