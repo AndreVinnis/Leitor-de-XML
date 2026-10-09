@@ -84,6 +84,13 @@
   color: var(--cor-texto-secundario);
 }
 
+.botoesSelecao {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--espaco-3);
+}
+
 .tituloSecao {
   font-size: 17px;
   font-weight: 700;
